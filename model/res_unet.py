@@ -89,12 +89,12 @@ class Res_UNet(nn.Module):
         for ch in chs:
             _down = []
             _up = []
+            if res in attn_res: _up.append(AttnBlock(feature * prech))
             for idx in range(num_res_block)[::-1]:
                 _down.append(_res_ch(feature * prech, feature * ch))
                 _up.insert(0, _res_ch(feature * ch * (2 if idx == 0 else 1), feature * prech))
                 prech = ch
             if res in attn_res: _down.append(AttnBlock(feature * ch))
-            if res in attn_res: _up.append(AttnBlock(feature * ch))
             self.down.append(Res_AttnBlock(_down))
             self.up.insert(0, Res_AttnBlock(_up))
             res //= 2

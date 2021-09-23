@@ -16,7 +16,7 @@ class UNet(nn.Module):
         if self.is_cls_embed:
             self.cls_embed = nn.Linear(1, features)
 
-        features = features
+        self.features = features
         self.encoder1 = UNet._block(in_channels, features, is_time_embed, is_cls_embed)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.encoder2 = UNet._block(features, features * 2, is_time_embed, is_cls_embed)

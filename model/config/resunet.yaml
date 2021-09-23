@@ -8,6 +8,8 @@ epoch: 10000
 batchsize: 128
 stride: 1
 samplebatchsize: 4
+eta: 0
+
 model:
   in_ch: 3
   feature: 128

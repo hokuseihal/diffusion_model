@@ -15,11 +15,11 @@ def train():
     for idx, data in enumerate(loader):
         data = data.to(device)
         stat = diffusion.trainbatch(data)
-        print(f'{e}/{cfg["epoch"]} {idx}/{len(loader)} {stat["loss"]:.2}')
+        print(f'{idx//len(loader)}/{cfg["epoch"]} {idx%len(loader)}/{len(loader)} {stat["loss"]:.2}')
         if idx % 1000 == 0:
             save_image(diffusion.sample(stride=cfg['stride'],
                                         shape=(cfg['samplebatchsize'], 3, cfg['model']['size'], cfg['model']['size']),embch=cfg['model']['embch']),
-                       f'{savefolder}/{e}_{idx}.jpg')
+                       f'{savefolder}/{idx}.jpg')
 
 
 if __name__ == "__main__":
@@ -47,7 +47,6 @@ if __name__ == "__main__":
     loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'], batch=cfg['batchsize'],
                            size=cfg['model']['size'], s=0.5, m=0.5)
     diffusion = Diffusion(denoizer=denoizer, criterion=criterion, optimizer=optimizer, schedule=cfg['schedule'],
-                          device=device,lr=cfg['lr'])
-    for e in range(cfg['epoch']):
-        train()
-        # check_fid()
+                          device=device,lr=cfg['lr'],eta=cfg['eta'])
+    train()
+    # check_fid()

@@ -1,4 +1,5 @@
 import math
+from functools import partial
 
 import numpy as np
 import torch
@@ -26,7 +27,7 @@ def get_timestep_embedding(timesteps, embedding_dim):
 
 
 class Diffusion():
-    def __init__(self, denoizer, criterion, optimizer, schedule, device, lr, embch=32, type='ddpm', n_iter=1000,
+    def __init__(self, denoizer, criterion, optimizer, schedule, device, lr, eta, embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
         self.device = device
         self.denoizer = denoizer
@@ -35,8 +36,7 @@ class Diffusion():
         self.embch = embch
         self.optimizer = optimizer(self.denoizer.parameters(), lr=lr)
         self.n_iter = n_iter
-        if self.type == 'ddpm':
-            self.nextsample = self.ddpmnextsample
+        self.nextsample = partial(self.ddimnextsample, eta=eta)
         if schedule == 'cos':
             f = lambda t, s=1e-3: torch.cos((t / self.n_iter + s) / (1 + s) * np.pi / 2)
             self.a = (f(torch.linspace(*beta, self.n_iter)) / f(0)).to(self.device)
@@ -63,7 +63,7 @@ class Diffusion():
     def sample(self, stride, embch, shape=None, x=None):
         assert not (shape is None and x is None)
         if x is None: x = torch.rand(shape).to(self.device)
-        for t in torch.range(self.n_iter-1, 0, -stride, dtype=torch.long):
+        for t in torch.range(self.n_iter - 1, 0, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch).to(self.device)
             et = self.denoizer(x, ys)
@@ -73,3 +73,9 @@ class Diffusion():
     def ddpmnextsample(self, x, et, t):
         c = (1 - self.a[t - 1]) / (1 - self.a[t]) * (1 - self._a[t])
         return 1 / self._a[t].sqrt() * (x - (1 - self._a[t]) / (1 - self.a[t].sqrt()) * et) + c * torch.rand_like(x)
+
+    def ddimnextsample(self, xt, et, t, eta):
+        c1 = eta * ((1 - self.a[t] / self.a[t - 1]) * (1 - self.a[t - 1]) / (1 - self.a[t])).sqrt()
+        c2 = ((1 - self.a[t - 1]) - c1 ** 2).sqrt()
+        x0_t = (xt - (1 - self.a[t]).sqrt() * et) / self.a[t].sqrt()
+        return self.a[t - 1].sqrt() * x0_t + c1 * torch.randn_like(xt) + c2 * et

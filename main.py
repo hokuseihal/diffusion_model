@@ -43,10 +43,9 @@ if __name__ == "__main__":
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
     denoizer = model.Res_UNet(**cfg['model']).to(device)
-    optimizer = torch.optim.Adam
     loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'], batch=cfg['batchsize'],
                            size=cfg['model']['size'], s=0.5, m=0.5)
-    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, optimizer=optimizer, schedule=cfg['schedule'],
+    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, schedule=cfg['schedule'],
                           device=device,lr=cfg['lr'],eta=cfg['eta'])
     train()
     # check_fid()

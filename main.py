@@ -1,4 +1,5 @@
 import os
+import pickle as pkl
 import shutil
 
 import torch
@@ -6,7 +7,9 @@ import torch.nn as nn
 from torchvision.utils import save_image
 
 import model
+import utils.fid as lfid
 from model.diffusion import Diffusion
+from utils.gtmodel import InceptionV3
 from utils.tfrecord import TFRDataloader
 
 
@@ -15,11 +18,27 @@ def train():
     for idx, data in enumerate(loader):
         data = data.to(device)
         stat = diffusion.trainbatch(data)
-        print(f'{idx//len(loader)}/{cfg["epoch"]} {idx%len(loader)}/{len(loader)} {stat["loss"]:.2}')
+        print(f'{idx // len(loader)}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
         if idx % 1000 == 0:
-            save_image(diffusion.sample(stride=cfg['stride'],
-                                        shape=(cfg['samplebatchsize'], 3, cfg['model']['size'], cfg['model']['size']),embch=cfg['model']['embch']),
+            save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
                        f'{savefolder}/{idx}.jpg')
+
+
+@torch.no_grad()
+def check_fid(num_image):
+    inception = InceptionV3([3]).to(device)
+    with open('__celeba_real.pkl', 'rb') as f:
+        realsigma, realmu = pkl.load(f)
+        realsigma = realsigma.to(device)
+        realmu = realmu.to(device)
+    mvci = lfid.MeanCoVariance_iter(device)
+    for idx in range(num_image // cfg['batchsize']):
+        x = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
+            device)
+        x = diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=x)
+        mvci.iter(inception(x)[0])
+    fid = lfid.fid(realsigma, realmu, *mvci.get(isbias=True))
+    print(fid)
 
 
 if __name__ == "__main__":
@@ -46,6 +65,8 @@ if __name__ == "__main__":
     loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'], batch=cfg['batchsize'],
                            size=cfg['model']['size'], s=0.5, m=0.5)
     diffusion = Diffusion(denoizer=denoizer, criterion=criterion, schedule=cfg['schedule'],
-                          device=device,lr=cfg['lr'],eta=cfg['eta'])
+                          device=device, lr=cfg['lr'], eta=cfg['eta'])
+    xT = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
+        device)
     train()
-    # check_fid()
+    # check_fid(2000)

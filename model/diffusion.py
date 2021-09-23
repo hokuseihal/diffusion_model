@@ -35,14 +35,16 @@ class Diffusion():
         self.criterion = criterion
         self.type = type
         self.embch = embch
-        self.optimizer = optim.AdaBound(self.denoizer.parameters(), lr=lr,amsbound=True)
+        self.optimizer = optim.AdaBound(self.denoizer.parameters(), lr=lr, amsbound=True)
         self.n_iter = n_iter
         self.nextsample = partial(self.ddimnextsample, eta=eta)
         # TODO need debug
         if schedule == 'cos':
             f = lambda t, s=1e-3: np.cos((t / self.n_iter + s) / (1 + s) * np.pi / 2)
             self.a = (f(torch.linspace(*beta, self.n_iter)) / f(0)).to(self.device)
-            self.b = (torch.clip(1 - self.a / torch.cat([torch.ones(1).to(self.device),self.a[:-1]],dim=-1), 0.999)).to(self.device)
+            self.b = (
+                torch.clip(1 - self.a / torch.cat([torch.ones(1).to(self.device), self.a[:-1]], dim=-1), 0.999)).to(
+                self.device)
         elif schedule == 'linear':
             self.b = torch.linspace(*beta, self.n_iter).to(self.device)
             self.a = torch.cumprod(1 - self.b, -1).to(self.device)
@@ -65,7 +67,7 @@ class Diffusion():
     def sample(self, stride, embch, shape=None, x=None):
         assert not (shape is None and x is None)
         if x is None: x = torch.rand(shape).to(self.device)
-        for t in torch.range(self.n_iter - 1, 1, -stride, dtype=torch.long):
+        for t in torch.arange(self.n_iter - 1, 1, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch).to(self.device)
             et = self.denoizer(x, ys)
@@ -73,11 +75,12 @@ class Diffusion():
         return x
 
     def ddpmnextsample(self, x, et, t):
+        assert t >= 1
         c = (1 - self.a[t - 1]) / (1 - self.a[t]) * (1 - self._a[t])
         return 1 / self._a[t].sqrt() * (x - (1 - self._a[t]) / (1 - self.a[t].sqrt()) * et) + c * torch.rand_like(x)
 
     def ddimnextsample(self, xt, et, t, eta):
-        assert t>=1
+        assert t >= 1
         c1 = eta * ((1 - self.a[t] / self.a[t - 1]) * (1 - self.a[t - 1]) / (1 - self.a[t])).sqrt()
         c2 = ((1 - self.a[t - 1]) - c1 ** 2).sqrt()
         x0_t = (xt - (1 - self.a[t]).sqrt() * et) / self.a[t].sqrt()

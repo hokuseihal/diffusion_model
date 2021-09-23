@@ -1,11 +1,11 @@
-size: 32
+size: 64
 n_iter: 1000
 type: ddpm
 schedule: linear
 loss: mse
 lr: 0.0002
 epoch: 10000
-batchsize: 64
+batchsize: 128
 stride: 1
 samplebatchsize: 4
 model:
@@ -13,9 +13,9 @@ model:
   feature: 128
   embch: 32
   size: 32
-  attn_res: []
+  attn_res: [16,]
   chs: [1,2,2,2,4]
-  num_res_block: 1
+  num_res_block: 2
   isclsemb: false
   dropout: 0
   group: 32

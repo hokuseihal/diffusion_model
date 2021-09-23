@@ -3,7 +3,7 @@ n_iter: 1000
 type: ddpm
 schedule: linear
 loss: mse
-lr: 0.00002
+lr: 0.0002
 epoch: 10000
 batchsize: 128
 stride: 1
@@ -19,6 +19,6 @@ model:
   chs: [1,2,2,2,4]
   num_res_block: 2
   isclsemb: false
-  dropout: 0
+  dropout: 0.1
   group: 32
   out_ch: 3

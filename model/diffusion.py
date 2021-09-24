@@ -28,14 +28,14 @@ def get_timestep_embedding(timesteps, embedding_dim):
 
 
 class Diffusion():
-    def __init__(self, denoizer, criterion, schedule, device, lr, eta, embch=32, n_iter=1000,
+    def __init__(self, denoizer, criterion, schedule, device, lr, eta, g_clip,embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
         self.device = device
         self.denoizer = denoizer
         self.criterion = criterion
         self.type = type
         self.embch = embch
-        self.optimizer = optim.AdaBound(self.denoizer.parameters(), lr=lr, amsbound=True,final_lr=1e-4)
+        self.optimizer = torch.optim.Adam(self.denoizer.parameters(), lr=lr)
         self.n_iter = n_iter
         self.nextsample = partial(self.ddimnextsample, eta=eta)
         # TODO need debug
@@ -49,6 +49,7 @@ class Diffusion():
             self.b = torch.linspace(*beta, self.n_iter).to(self.device)
             self.a = torch.cumprod(1 - self.b, -1).to(self.device)
             self._a = 1 - self.b
+        self.g_clip=g_clip
 
     def trainbatch(self, x):
         B, C, H, W = x.shape
@@ -59,6 +60,9 @@ class Diffusion():
         output = self.denoizer(xt, t)
         loss = self.criterion(e, output)
         loss.backward()
+        torch.nn.utils.clip_grad_norm(
+            self.denoizer.parameters(),self.g_clip
+        )
         self.optimizer.step()
         self.optimizer.zero_grad()
         return {'loss': loss.item()}

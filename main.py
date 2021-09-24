@@ -64,8 +64,7 @@ if __name__ == "__main__":
     denoizer = model.Res_UNet(**cfg['model']).to(device)
     loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'], batch=cfg['batchsize'],
                            size=cfg['model']['size'], s=0.5, m=0.5)
-    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, schedule=cfg['schedule'],
-                          device=device, lr=cfg['lr'], eta=cfg['eta'])
+    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device,**cfg['diffusion'])
     xT = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
         device)
     train()

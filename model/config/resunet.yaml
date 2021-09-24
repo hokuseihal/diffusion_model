@@ -1,15 +1,17 @@
 size: 64
 n_iter: 1000
 type: ddpm
-schedule: linear
 loss: mse
-lr: 0.0002
 epoch: 10000
 batchsize: 128
 stride: 1
 samplebatchsize: 4
-eta: 0
 
+diffusion:
+  eta: 0 
+  g_clip: 1.0
+  schedule: linear
+  lr: 0.0002
 model:
   in_ch: 3
   feature: 128

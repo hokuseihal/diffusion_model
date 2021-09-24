@@ -35,7 +35,7 @@ class Diffusion():
         self.criterion = criterion
         self.type = type
         self.embch = embch
-        self.optimizer = optim.AdaBound(self.denoizer.parameters(), lr=lr, amsbound=True)
+        self.optimizer = optim.AdaBound(self.denoizer.parameters(), lr=lr, amsbound=True,final_lr=1e-4)
         self.n_iter = n_iter
         self.nextsample = partial(self.ddimnextsample, eta=eta)
         # TODO need debug

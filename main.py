@@ -19,7 +19,7 @@ def train():
         data = data.to(device)
         stat = diffusion.trainbatch(data)
         print(f'{idx // len(loader)}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if idx % 1000 == 0:
+        if idx % 1000 == 0 and idx!=0:
             save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
                        f'{savefolder}/{idx}.jpg')
 

@@ -4,6 +4,8 @@ from functools import partial
 import numpy as np
 import torch
 import torch_optimizer as optim
+import torch.optim.lr_scheduler as sche
+import utils.ema_scheduler  as ema
 
 
 def get_timestep_embedding(timesteps, embedding_dim):
@@ -36,6 +38,8 @@ class Diffusion():
         self.type = type
         self.embch = embch
         self.optimizer = torch.optim.Adam(self.denoizer.parameters(), lr=lr)
+        self.scheduler=sche.ReduceLROnPlateau(self.optimizer,verbose=True)
+        self.scheduler=ema.EMA_scheduler(self.optimizer,verbose=True)
         self.n_iter = n_iter
         self.nextsample = partial(self.ddimnextsample, eta=eta)
         # TODO need debug
@@ -64,6 +68,7 @@ class Diffusion():
             self.denoizer.parameters(),self.g_clip
         )
         self.optimizer.step()
+        self.scheduler.step(loss)
         self.optimizer.zero_grad()
         return {'loss': loss.item()}
 

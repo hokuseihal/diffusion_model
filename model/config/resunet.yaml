@@ -3,24 +3,24 @@ n_iter: 1000
 type: ddpm
 loss: mse
 epoch: 10000
-batchsize: 128
+batchsize: 32
 stride: 1
 samplebatchsize: 4
 
 diffusion:
-  eta: 0 
+  eta: 0
   g_clip: 1.0
   schedule: linear
-  lr: 0.0002
+  lr: 0.001
 model:
   in_ch: 3
   feature: 128
   embch: 32
   size: 32
-  attn_res: [16,]
-  chs: [1,2,2,2,4]
+  attn_res: [ 16, ]
+  chs: [ 1,2,2,2,4 ]
   num_res_block: 2
   isclsemb: false
   dropout: 0.1
-  group: 32
+  group: 1
   out_ch: 3

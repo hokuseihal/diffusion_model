@@ -3,9 +3,9 @@ n_iter: 1000
 type: ddpm
 loss: mse
 epoch: 10000
-batchsize: 32
+batchsize: 128
 stride: 1
-samplebatchsize: 4
+samplebatchsize: 32
 
 diffusion:
   eta: 0

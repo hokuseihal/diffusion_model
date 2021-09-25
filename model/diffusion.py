@@ -3,8 +3,8 @@ from functools import partial
 
 import numpy as np
 import torch
-import torch_optimizer as optim
 import torch.optim.lr_scheduler as sche
+
 import utils.ema_scheduler  as ema
 
 
@@ -30,7 +30,7 @@ def get_timestep_embedding(timesteps, embedding_dim):
 
 
 class Diffusion():
-    def __init__(self, denoizer, criterion, schedule, device, lr, eta, g_clip,embch=32, n_iter=1000,
+    def __init__(self, denoizer, criterion, schedule, device, lr, eta, g_clip, embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
         self.device = device
         self.denoizer = denoizer
@@ -38,8 +38,8 @@ class Diffusion():
         self.type = type
         self.embch = embch
         self.optimizer = torch.optim.Adam(self.denoizer.parameters(), lr=lr)
-        self.scheduler=sche.ReduceLROnPlateau(self.optimizer,verbose=True)
-        self.scheduler=ema.EMA_scheduler(self.optimizer,verbose=True)
+        self.scheduler = sche.ReduceLROnPlateau(self.optimizer, verbose=True)
+        self.scheduler = ema.EMA_scheduler(self.optimizer, verbose=True)
         self.n_iter = n_iter
         self.nextsample = partial(self.ddimnextsample, eta=eta)
         # TODO need debug
@@ -53,7 +53,7 @@ class Diffusion():
             self.b = torch.linspace(*beta, self.n_iter).to(self.device)
             self.a = torch.cumprod(1 - self.b, -1).to(self.device)
             self._a = 1 - self.b
-        self.g_clip=g_clip
+        self.g_clip = g_clip
 
     def trainbatch(self, x):
         B, C, H, W = x.shape
@@ -62,14 +62,14 @@ class Diffusion():
         e = torch.rand_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
         output = self.denoizer(xt, t)
-        loss = self.criterion(e, output)
+        loss = self.criterion((1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e, output)
         loss.backward()
         torch.nn.utils.clip_grad_norm(
-            self.denoizer.parameters(),self.g_clip
+            self.denoizer.parameters(), self.g_clip
         )
         self.optimizer.step()
-        self.scheduler.step(loss)
         self.optimizer.zero_grad()
+        self.scheduler.step(loss)
         return {'loss': loss.item()}
 
     @torch.no_grad()
@@ -94,3 +94,7 @@ class Diffusion():
         c2 = ((1 - self.a[t - 1]) - c1 ** 2).sqrt()
         x0_t = (xt - (1 - self.a[t]).sqrt() * et) / self.a[t].sqrt()
         return self.a[t - 1].sqrt() * x0_t + c1 * torch.randn_like(xt) + c2 * et
+
+    def testnextsample(self, xt, et, t):
+        assert t >= 1
+        return (xt - et) / self.a[t]

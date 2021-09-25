@@ -60,8 +60,8 @@ class Diffusion():
         t = get_timestep_embedding(T, self.embch).to(self.device)
         e = torch.rand_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
-        # target=e
-        target = (1 - self.a[T - 1].view(-1, 1, 1, 1)).sqrt() * e
+        target=e
+        # target = (1 - self.a[T - 1].view(-1, 1, 1, 1)).sqrt() * e
         output = self.denoizer(xt, t)
         loss = self.criterion(target, output)
         loss.backward()
@@ -81,7 +81,7 @@ class Diffusion():
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch).to(self.device)
             et = self.denoizer(x, ys)
-            x = self.testnextsample(x, et, t)
+            x = self.nextsample(x, et, t)
         return x
 
     def ddpmnextsample(self, x, et, t):

@@ -59,6 +59,8 @@ if __name__ == "__main__":
     savefolder = f'result/{args.savefolder}'
     shutil.rmtree(savefolder, ignore_errors=True)
     os.mkdir(savefolder)
+    if cfg['epoch']==-1:
+        cfg['epoch']=500000/202589*cfg['batchsize']
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
     denoizer = Res_UNet(**cfg['model']).to(device)

@@ -5,7 +5,7 @@ import shutil
 import torch
 import torch.nn as nn
 
-import model
+from model.res_unet import Res_UNet
 import utils.fid as lfid
 import utils.util as U
 from model.diffusion import Diffusion
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     os.mkdir(savefolder)
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
-    denoizer = model.Res_UNet(**cfg['model']).to(device)
+    denoizer = Res_UNet(**cfg['model']).to(device)
     loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'], batch=cfg['batchsize'],
                            size=cfg['model']['size'], s=0.5, m=0.5)
     diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, **cfg['diffusion'])

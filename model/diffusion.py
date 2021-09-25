@@ -42,6 +42,7 @@ class Diffusion():
         self.scheduler = ema.EMA_scheduler(self.optimizer, verbose=True)
         self.n_iter = n_iter
         self.nextsample = partial(self.ddimnextsample, eta=eta)
+        # self.nextsample=self.testnextsample
         # TODO need debug
         if schedule == 'cos':
             f = lambda t, s=1e-3: np.cos((t / self.n_iter + s) / (1 + s) * np.pi / 2)
@@ -61,8 +62,10 @@ class Diffusion():
         t = get_timestep_embedding(T, self.embch).to(self.device)
         e = torch.rand_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
+        target=e
+        # target=(1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
         output = self.denoizer(xt, t)
-        loss = self.criterion((1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e, output)
+        loss = self.criterion(target, output)
         loss.backward()
         torch.nn.utils.clip_grad_norm(
             self.denoizer.parameters(), self.g_clip

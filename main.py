@@ -4,10 +4,10 @@ import shutil
 
 import torch
 import torch.nn as nn
-from torchvision.utils import save_image
 
 import model
 import utils.fid as lfid
+import utils.util as U
 from model.diffusion import Diffusion
 from utils.gtmodel import InceptionV3
 from utils.tfrecord import TFRDataloader
@@ -19,9 +19,9 @@ def train():
         data = data.to(device)
         stat = diffusion.trainbatch(data)
         print(f'{idx // len(loader)}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if idx % 1000 == 0 and idx!=0:
-            save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
-                       f'{savefolder}/{idx}.jpg')
+        if idx % 1000 == 0 and idx != 0:
+            U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
+                         f'{savefolder}/{idx}.jpg', s=0.5, m=0.5)
 
 
 @torch.no_grad()
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     denoizer = model.Res_UNet(**cfg['model']).to(device)
     loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'], batch=cfg['batchsize'],
                            size=cfg['model']['size'], s=0.5, m=0.5)
-    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device,**cfg['diffusion'])
+    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, **cfg['diffusion'])
     xT = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
         device)
     train()

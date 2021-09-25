@@ -12,14 +12,13 @@ from model.diffusion import Diffusion
 from utils.gtmodel import InceptionV3
 from utils.tfrecord import TFRDataloader
 
-
 def train():
     denoizer.train()
     for idx, data in enumerate(loader):
         data = data.to(device)
         stat = diffusion.trainbatch(data)
         print(f'{idx // len(loader)}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if idx % 1000 == 0 and idx != 0:
+        if idx % 1000 == 0 :#and idx != 0:
             U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
                          f'{savefolder}/{idx}.jpg', s=0.5, m=0.5)
 
@@ -60,7 +59,7 @@ if __name__ == "__main__":
     shutil.rmtree(savefolder, ignore_errors=True)
     os.mkdir(savefolder)
     if cfg['epoch']==-1:
-        cfg['epoch']=500000/202589*cfg['batchsize']
+        cfg['epoch']=int(500000/202589*cfg['batchsize'])
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
     denoizer = Res_UNet(**cfg['model']).to(device)

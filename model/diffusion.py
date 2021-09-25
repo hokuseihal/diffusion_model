@@ -37,8 +37,7 @@ class Diffusion():
         self.type = type
         self.embch = embch
         self.optimizer = torch.optim.Adam(self.denoizer.parameters(), lr=lr)
-        self.scheduler = sche.ReduceLROnPlateau(self.optimizer, verbose=True)
-        self.scheduler = ema.EMA_scheduler(self.optimizer, verbose=True)
+        # self.scheduler = ema.EMA_scheduler(self.optimizer, verbose=True)
         self.n_iter = n_iter
         # self.nextsample = partial(self.ddimnextsample, eta=eta)
         self.nextsample = self.testnextsample
@@ -71,7 +70,7 @@ class Diffusion():
         )
         self.optimizer.step()
         self.optimizer.zero_grad()
-        self.scheduler.step(loss)
+        # self.scheduler.step(loss)
         return {'loss': loss.item()}
 
     @torch.no_grad()

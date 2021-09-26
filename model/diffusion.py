@@ -3,6 +3,8 @@ from functools import partial
 
 import numpy as np
 import torch
+torch.manual_seed(0)
+torch.cuda.manual_seed(0)
 
 
 def get_timestep_embedding(timesteps, embedding_dim):
@@ -60,9 +62,9 @@ class Diffusion():
         output = self.denoizer(xt, t)
         loss = self.criterion(target, output)
         loss.backward()
-        torch.nn.utils.clip_grad_norm(
-            self.denoizer.parameters(), self.g_clip
-        )
+        # torch.nn.utils.clip_grad_norm(
+        #     self.denoizer.parameters(), self.g_clip
+        # )
         self.optimizer.step()
         self.optimizer.zero_grad()
         return {'loss': loss.item()}

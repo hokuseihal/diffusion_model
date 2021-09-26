@@ -1,10 +1,8 @@
 import math
+from functools import partial
 
 import numpy as np
 import torch
-import torch.optim.lr_scheduler as sche
-
-import utils.ema_scheduler  as ema
 
 
 def get_timestep_embedding(timesteps, embedding_dim):
@@ -37,10 +35,8 @@ class Diffusion():
         self.type = type
         self.embch = embch
         self.optimizer = torch.optim.Adam(self.denoizer.parameters(), lr=lr)
-        # self.scheduler = ema.EMA_scheduler(self.optimizer, verbose=True)
         self.n_iter = n_iter
-        # self.nextsample = partial(self.ddimnextsample, eta=eta)
-        self.nextsample = self.testnextsample
+        self.nextsample = partial(self.ddimnextsample, eta=eta)
         # TODO need debug
         if schedule == 'cos':
             f = lambda t, s=1e-3: np.cos((t / self.n_iter + s) / (1 + s) * np.pi / 2)
@@ -60,8 +56,7 @@ class Diffusion():
         t = get_timestep_embedding(T, self.embch).to(self.device)
         e = torch.rand_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
-        target=e
-        # target = (1 - self.a[T - 1].view(-1, 1, 1, 1)).sqrt() * e
+        target = e
         output = self.denoizer(xt, t)
         loss = self.criterion(target, output)
         loss.backward()
@@ -70,7 +65,6 @@ class Diffusion():
         )
         self.optimizer.step()
         self.optimizer.zero_grad()
-        # self.scheduler.step(loss)
         return {'loss': loss.item()}
 
     @torch.no_grad()
@@ -95,9 +89,3 @@ class Diffusion():
         c2 = ((1 - self.a[t - 1]) - c1 ** 2).sqrt()
         x0_t = (xt - (1 - self.a[t]).sqrt() * et) / self.a[t].sqrt()
         return self.a[t - 1].sqrt() * x0_t + c1 * torch.randn_like(xt) + c2 * et
-
-    def testnextsample(self, xt, et, t):
-        assert t >= 1
-        c2 = (1 - self.a[t - 1]).sqrt()
-        x0_t = (xt - (1 - self.a[t]).sqrt() * et / c2) / self.a[t].sqrt()
-        return self.a[t - 1].sqrt() * x0_t + et

@@ -30,8 +30,9 @@ def get_timestep_embedding(timesteps, embedding_dim):
 
 
 class Diffusion():
-    def __init__(self, denoizer, criterion, schedule, device, lr, eta, g_clip, embch=32, n_iter=1000,
+    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp,g_clip, embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
+        self.amp=amp
         self.device = device
         self.denoizer = denoizer
         self.criterion = criterion
@@ -52,6 +53,7 @@ class Diffusion():
             self.a = torch.cumprod(1 - self.b, -1).to(self.device)
             self._a = 1 - self.b
         self.g_clip = g_clip
+        self.scaler=torch.cuda.amp.GradScaler()
 
     def trainbatch(self, x):
         B, C, H, W = x.shape
@@ -60,13 +62,15 @@ class Diffusion():
         e = randn_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
         target = e
-        output = self.denoizer(xt, t)
-        loss = self.criterion(target, output)
-        loss.backward()
+        with torch.cuda.amp.autocast(self.amp):
+            output = self.denoizer(xt, t)
+            loss = self.criterion(target, output)
+        self.scaler.scale(loss).backward()
         # torch.nn.utils.clip_grad_norm(
         #     self.denoizer.parameters(), self.g_clip
         # )
-        self.optimizer.step()
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
         self.optimizer.zero_grad()
         return {'loss': loss.item()}
 

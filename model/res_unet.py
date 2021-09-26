@@ -36,17 +36,21 @@ class ResBlock(nn.Module):
 
 
 class AttnBlock(nn.Module):
-    def __init__(self, feature, dimff=None, nhead=4, ):
+    def __init__(self, feature, nhead=4):
         super(AttnBlock, self).__init__()
-        if dimff is None: dimff = feature
-        self.attn = nn.TransformerEncoderLayer(feature, nhead, activation='gelu', dim_feedforward=dimff)
+        self.feature = torch.tensor(feature)
+        self.v = nn.Conv2d(feature, feature, 1)
+        self.q = nn.Conv2d(feature, feature, 1)
+        self.k = nn.Conv2d(feature, feature, 1)
+        self.out = nn.Conv2d(feature, feature, 1)
+        # self.attn = nn.TransformerEncoderLayer(feature, nhead, activation='gelu', dim_feedforward=dimff)
+        self.norm=nn.GroupNorm(32,feature)
 
     def forward(self, x):
-        B, C, H, W = x.shape
-        x = x.view(B, C, H * W).permute(2, 0, 1)
-        x = self.attn(x)
-        x = x.permute(1, 2, 0).view(B, C, H, W)
-        return x
+        _x=x
+        x=self.norm(x)
+        return _x+self.out(torch.einsum('bhwnm,bcnm->bchw', F.softmax(
+            torch.einsum('bchw,bcij->bhwij', self.q(x), self.k(x)) / self.feature.float().sqrt()), self.v(x)))
 
 
 class Res_AttnBlock(nn.Module):
@@ -113,22 +117,21 @@ class Res_UNet(nn.Module):
             x = l(x, emb)
             skips.append(x)
             if idx < len(self.down) - 1: x = F.interpolate(x, scale_factor=0.5, mode='bilinear')
-        x = self.bottolnec(x, emb)
         for idx, l in enumerate(self.up):
             tmp = skips.pop(-1)
             x = l(torch.cat([x, tmp], dim=1), emb)
             if idx < len(self.up) - 1: x = F.interpolate(x, scale_factor=2, mode='bilinear')
-        x=self.out(x)
+        x = self.out(x)
         return x
 
 
 if __name__ == '__main__':
-    with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-                                profile_memory=True) as p:
-        m = Res_UNet(in_ch=3, feature=128, size=128, embch=64).cuda()
-        print(m)
-        x = torch.randn(8, 3, 64, 64).cuda()
-        temb = torch.randn(8, 64).cuda()
+    device = 'cuda'
+    m = Res_UNet(in_ch=3, feature=128, size=128, embch=64).to(device)
+    print(m)
+    with torch.cuda.amp.autocast():
+        x = torch.randn(8, 3, 64, 64).to(device)
+        temb = torch.randn(8, 64).to(device)
         output = m(x, temb)
-        print(output.shape)
-    print(p.key_averages())
+        print(output.dtype)
+    print(output.shape)

@@ -57,6 +57,7 @@ class Diffusion():
 
     def trainbatch(self, x):
         B, C, H, W = x.shape
+        x=x.to(self.device)
         T = torch.randint(self.n_iter, (B,))
         t = get_timestep_embedding(T, self.embch).to(self.device)
         e = randn_like(x).to(self.device)
@@ -83,6 +84,7 @@ class Diffusion():
             ys = get_timestep_embedding(t.view(1), embch).to(self.device)
             et = self.denoizer(x, ys)
             x = self.nextsample(x, et, t)
+        print()
         return x
 
     def ddpmnextsample(self, x, et, t):

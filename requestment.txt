@@ -4,3 +4,4 @@ pyyaml
 torch_optimizer
 scipy
 numpy
+tensorflow

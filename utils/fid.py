@@ -10,8 +10,9 @@ class MeanCoVariance_iter:
 
     def iter(self, xn):
         xn = xn.double()
-        B, C, _, _ = xn.shape
-        xn = xn.view(B, C)
+        B, C= xn.shape
+        # B, C, _, _ = xn.shape
+        # xn = xn.view(B, C)
         mun = (self.n * self.mu + xn.sum(dim=0)) / (self.n + B)
         sn = 1 / (self.n + B) * torch.einsum('ij,ik->jk', xn, xn) \
              + self.n / (self.n + B) * torch.einsum('i,j->ij', self.mu, self.mu) \

@@ -3,6 +3,7 @@ from functools import partial
 
 import numpy as np
 import torch
+from torch import randn,randn_like
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
@@ -56,7 +57,7 @@ class Diffusion():
         B, C, H, W = x.shape
         T = torch.randint(self.n_iter, (B,))
         t = get_timestep_embedding(T, self.embch).to(self.device)
-        e = torch.rand_like(x).to(self.device)
+        e = randn_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
         target = e
         output = self.denoizer(xt, t)
@@ -72,7 +73,7 @@ class Diffusion():
     @torch.no_grad()
     def sample(self, stride, embch, shape=None, x=None):
         assert not (shape is None and x is None)
-        if x is None: x = torch.rand(shape).to(self.device)
+        if x is None: x = randn(shape).to(self.device)
         for t in torch.arange(self.n_iter - 1, 1, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch).to(self.device)
@@ -83,11 +84,11 @@ class Diffusion():
     def ddpmnextsample(self, x, et, t):
         assert t >= 1
         c = (1 - self.a[t - 1]) / (1 - self.a[t]) * (1 - self._a[t])
-        return 1 / self._a[t].sqrt() * (x - (1 - self._a[t]) / (1 - self.a[t].sqrt()) * et) + c * torch.rand_like(x)
+        return 1 / self._a[t].sqrt() * (x - (1 - self._a[t]) / (1 - self.a[t].sqrt()) * et) + c * randn_like(x)
 
     def ddimnextsample(self, xt, et, t, eta):
         assert t >= 1
         c1 = eta * ((1 - self.a[t] / self.a[t - 1]) * (1 - self.a[t - 1]) / (1 - self.a[t])).sqrt()
         c2 = ((1 - self.a[t - 1]) - c1 ** 2).sqrt()
         x0_t = (xt - (1 - self.a[t]).sqrt() * et) / self.a[t].sqrt()
-        return self.a[t - 1].sqrt() * x0_t + c1 * torch.randn_like(xt) + c2 * et
+        return self.a[t - 1].sqrt() * x0_t + c1 * randn_like(xt) + c2 * et

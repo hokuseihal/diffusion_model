@@ -67,9 +67,9 @@ class Diffusion():
             output = self.denoizer(xt, t)
             loss = self.criterion(target, output)
         self.scaler.scale(loss).backward()
-        # torch.nn.utils.clip_grad_norm(
-        #     self.denoizer.parameters(), self.g_clip
-        # )
+        torch.nn.utils.clip_grad_norm(
+            self.denoizer.parameters(), self.g_clip
+        )
         self.scaler.step(self.optimizer)
         self.scaler.update()
         self.optimizer.zero_grad()

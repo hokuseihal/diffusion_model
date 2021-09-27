@@ -5,10 +5,12 @@ import shutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 import utils.fid as lfid
 import utils.util as U
 from model.diffusion import Diffusion
 from model.res_unet import Res_UNet
+from plotter import Plotter
 from utils.gtmodel import fid_inception_v3
 from utils.tfrecord import TFRDataloader
 
@@ -25,13 +27,12 @@ def train():
 
 @torch.no_grad()
 def check_fid(num_image):
-
     mvci = lfid.MeanCoVariance_iter(device)
     for idx in range(num_image // cfg['batchsize'] + 1):
         x = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
             device)
-        # x = diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=x)
-        x=F.interpolate(x,(299,299))
+        x = diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=x)
+        x = F.interpolate(x, (299, 299))
         mvci.iter(inception(x))
     fid = lfid.fid(realsigma, realmu, *mvci.get(isbias=True))
     print(fid)
@@ -71,5 +72,6 @@ if __name__ == "__main__":
         realsigma, realmu = pkl.load(f)
         realsigma = realsigma.to(device)
         realmu = realmu.to(device)
+    pltr = Plotter(f'{savefolder}/graph.jpg')
     # train()
     check_fid(50)

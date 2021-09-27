@@ -3,7 +3,8 @@ from functools import partial
 
 import numpy as np
 import torch
-from torch import randn,randn_like
+from torch import randn, randn_like
+
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
@@ -30,9 +31,9 @@ def get_timestep_embedding(timesteps, embedding_dim):
 
 
 class Diffusion():
-    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp,g_clip, embch=32, n_iter=1000,
+    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
-        self.amp=amp
+        self.amp = amp
         self.device = device
         self.denoizer = denoizer
         self.criterion = criterion
@@ -53,11 +54,11 @@ class Diffusion():
             self.a = torch.cumprod(1 - self.b, -1).to(self.device)
             self._a = 1 - self.b
         self.g_clip = g_clip
-        self.scaler=torch.cuda.amp.GradScaler()
+        self.scaler = torch.cuda.amp.GradScaler()
 
     def trainbatch(self, x):
         B, C, H, W = x.shape
-        x=x.to(self.device)
+        x = x.to(self.device)
         T = torch.randint(self.n_iter, (B,))
         t = get_timestep_embedding(T, self.embch).to(self.device)
         e = randn_like(x).to(self.device)

@@ -18,20 +18,21 @@ from utils.tfrecord import TFRDataloader
 def train():
     denoizer.train()
     for idx, data in enumerate(loader):
-        stat = diffusion.trainbatch(data,idx)
+        stat = diffusion.trainbatch(data, idx)
         print(f'{idx // len(loader)}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
         if idx % 1000 == 0 and idx != 0:
             U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
                          f'{savefolder}/{idx}.jpg', s=0.5, m=0.5)
-            fid=check_fid(253)
-            pltr.addvalue({'fid':fid},idx)
+            if (cfg['fid']):
+                fid = check_fid(253)
+                pltr.addvalue({'fid': fid}, idx)
 
 
 @torch.no_grad()
 def check_fid(num_image):
     mvci = lfid.MeanCoVariance_iter(device)
     for idx in range(num_image // cfg['batchsize'] + 1):
-        print(idx,num_image,cfg['batchsize'])
+        print(idx, num_image, cfg['batchsize'])
         x = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
             device)
         x = diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=x)
@@ -65,7 +66,8 @@ if __name__ == "__main__":
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
     denoizer = Res_UNet(**cfg['model']).to(device)
-    loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'], batch=cfg['batchsize']//cfg['diffusion']['subdivision'],
+    loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'],
+                           batch=cfg['batchsize'] // cfg['diffusion']['subdivision'],
                            size=cfg['model']['size'], s=0.5, m=0.5)
     diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, **cfg['diffusion'])
     xT = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(

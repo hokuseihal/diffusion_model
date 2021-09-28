@@ -44,12 +44,12 @@ class AttnBlock(nn.Module):
         self.k = nn.Conv2d(feature, feature, 1)
         self.out = nn.Conv2d(feature, feature, 1)
         # self.attn = nn.TransformerEncoderLayer(feature, nhead, activation='gelu', dim_feedforward=dimff)
-        self.norm=nn.GroupNorm(32,feature)
+        self.norm = nn.GroupNorm(32, feature)
 
     def forward(self, x):
-        _x=x
-        x=self.norm(x)
-        return _x+self.out(torch.einsum('bhwnm,bcnm->bchw', F.softmax(
+        _x = x
+        x = self.norm(x)
+        return _x + self.out(torch.einsum('bhwnm,bcnm->bchw', F.softmax(
             torch.einsum('bchw,bcij->bhwij', self.q(x), self.k(x)) / self.feature.float().sqrt()), self.v(x)))
 
 
@@ -68,7 +68,7 @@ class Res_AttnBlock(nn.Module):
 
 
 class Res_UNet(nn.Module):
-    def __init__(self, in_ch, feature, embch, size, activate=nn.Hardswish(), attn_res=(), chs=(1, 2, 4),
+    def __init__(self, in_ch, feature, embch, size, bottle_attn, activate=nn.Hardswish(), attn_res=(), chs=(1, 2, 4),
                  num_res_block=1,
                  dropout=0, group=32,
                  isclsemb=False, out_ch=3):
@@ -81,11 +81,12 @@ class Res_UNet(nn.Module):
         _res_ch = lambda ch, outch=None: ResBlock(in_ch=ch, outch=outch, embch=embch, activate=activate, group=group,
                                                   isclsemb=isclsemb, dropout=dropout)
         self.convin = nn.Conv2d(in_ch, feature, 3, 1, 1)
-        self.bottolnec = Res_AttnBlock([
+        bottle = [
             _res_ch(feature * chs[-1]),
-            AttnBlock(feature * chs[-1]),
-            _res_ch(feature * chs[-1])
-        ])
+            _res_ch(feature * chs[-1])]
+        if bottle_attn:
+            bottle.insert(1, AttnBlock(feature * chs[-1]))
+        self.bottolnec = Res_AttnBlock(bottle)
         self.down = nn.ModuleList([])
         self.up = nn.ModuleList([])
         prech = 1

@@ -20,7 +20,7 @@ def train():
     for idx, data in enumerate(loader):
         stat = diffusion.trainbatch(data, idx)
         print(f'{idx // len(loader)}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if idx % 1000 == 0 and idx != 0:
+        if idx % 500 == 0 and idx != 0:
             U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
                          f'{savefolder}/{idx}.jpg', s=0.5, m=0.5)
             if (cfg['fid']):

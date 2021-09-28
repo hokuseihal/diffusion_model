@@ -65,17 +65,20 @@ class Diffusion():
         e = randn_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
         target = e
-        with torch.cuda.amp.autocast(self.amp):
-            output = self.denoizer(xt, t)
-            loss = self.criterion(target, output)
-        self.scaler.scale(loss / self.subdivision).backward()
-        torch.nn.utils.clip_grad_norm(
-            self.denoizer.parameters(), self.g_clip
-        )
-        if (idx % self.subdivision == self.subdivision - 1):
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            self.optimizer.zero_grad()
+        # with torch.cuda.amp.autocast(self.amp):
+        output = self.denoizer(xt, t)
+        loss = self.criterion(target, output)
+        # self.scaler.scale(loss / self.subdivision).backward()
+        # (loss / self.subdivision).backward()
+        loss.backward()
+        # torch.nn.utils.clip_grad_norm(
+        #     self.denoizer.parameters(), self.g_clip
+        # )
+        # if (idx % self.subdivision == self.subdivision - 1):
+            # self.scaler.step(self.optimizer)
+        self.optimizer.step()
+            # self.scaler.update()
+        self.optimizer.zero_grad()
         return {'loss': loss.item()}
 
     @torch.no_grad()

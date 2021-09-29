@@ -30,10 +30,9 @@ def get_timestep_embedding(timesteps, embedding_dim):
     return emb
 
 
-class Diffusion():
-    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, subdivision, lsp,embch=32, n_iter=1000,
+class Diffusion:
+    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, subdivision,embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
-        self.lsp=lsp
         self.subdivision = subdivision
         self.amp = amp
         self.device = device
@@ -59,6 +58,7 @@ class Diffusion():
         self.scaler = torch.cuda.amp.GradScaler()
 
     def trainbatch(self, x, idx):
+        self.denoizer.train()
         B, C, H, W = x.shape
         x = x.to(self.device)
         T = torch.randint(self.n_iter, (B,))
@@ -81,12 +81,13 @@ class Diffusion():
     @torch.no_grad()
     def sample(self, stride, embch, shape=None, x=None):
         assert not (shape is None and x is None)
+        self.denoizer.eval()
         if x is None: x = randn(shape).to(self.device)
         for t in torch.arange(self.n_iter - 1, 1, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch).to(self.device)
-            et = self.denoizer(x, ys)
-            x=self.lsp(x)
+            #TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.
+            et = self.denoizer.module(x, ys)
             x = self.nextsample(x, et, t)
         print()
         return x

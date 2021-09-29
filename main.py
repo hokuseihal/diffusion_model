@@ -16,7 +16,6 @@ from utils.tfrecord import TFRDataloader
 
 
 def train():
-    denoizer.train()
     for idx, data in enumerate(loader):
         stat = diffusion.trainbatch(data, idx)
         print(f'{idx // len(loader)}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
@@ -68,11 +67,10 @@ if __name__ == "__main__":
     denoizer = Res_UNet(**cfg['model']).to(device)
     if device=='cuda':
         denoizer=torch.nn.DataParallel(denoizer)
-        lsp=torch.nn.DataParallel(nn.Identity())
     loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'],
                            batch=cfg['batchsize'] // cfg['diffusion']['subdivision'],
                            size=cfg['model']['size'], s=0.5, m=0.5)
-    diffusion = Diffusion(lsp=lsp,denoizer=denoizer, criterion=criterion, device=device, **cfg['diffusion'])
+    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, **cfg['diffusion'])
     xT = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
         device)
     inception = fid_inception_v3().to(device)

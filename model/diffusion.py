@@ -31,8 +31,9 @@ def get_timestep_embedding(timesteps, embedding_dim):
 
 
 class Diffusion():
-    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, subdivision, embch=32, n_iter=1000,
+    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, subdivision, lsp,embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
+        self.lsp=lsp
         self.subdivision = subdivision
         self.amp = amp
         self.device = device
@@ -85,6 +86,7 @@ class Diffusion():
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch).to(self.device)
             et = self.denoizer(x, ys)
+            x=self.lsp(x)
             x = self.nextsample(x, et, t)
         print()
         return x

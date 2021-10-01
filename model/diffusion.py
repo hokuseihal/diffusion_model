@@ -4,7 +4,7 @@ from functools import partial
 import numpy as np
 import torch
 from torch import randn, randn_like
-
+from model.ema import EMAHelper
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
@@ -31,7 +31,7 @@ def get_timestep_embedding(timesteps, embedding_dim):
 
 
 class Diffusion:
-    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, subdivision,embch=32, n_iter=1000,
+    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, ema,ema_mu,subdivision,embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
         self.subdivision = subdivision
         self.amp = amp
@@ -43,6 +43,10 @@ class Diffusion:
         self.optimizer = torch.optim.Adam(self.denoizer.parameters(), lr=lr)
         self.n_iter = n_iter
         self.nextsample = partial(self.ddimnextsample, eta=eta)
+        self.ema=ema
+        if self.ema:
+            self.ema_helper=EMAHelper(ema_mu)
+            self.ema_helper.register(denoizer)
         # TODO need debug
         if schedule == 'cos':
             f = lambda t, s=1e-3: np.cos((t / self.n_iter + s) / (1 + s) * np.pi / 2)
@@ -75,6 +79,8 @@ class Diffusion:
         # )
         if (idx % self.subdivision == self.subdivision - 1):
             self.optimizer.step()
+            if self.ema:
+                self.ema_helper.update(self.denoizer)
             self.optimizer.zero_grad()
         return {'loss': loss.item()}
 
@@ -82,6 +88,8 @@ class Diffusion:
     def sample(self, stride, embch, shape=None, x=None):
         assert not (shape is None and x is None)
         self.denoizer.eval()
+        state=self.denoizer.state_dict()
+        self.ema_helper.ema(self.denoizer)
         if x is None: x = randn(shape).to(self.device)
         for t in torch.arange(self.n_iter - 1, 1, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
@@ -90,6 +98,7 @@ class Diffusion:
             et = self.denoizer.module(x, ys)
             x = self.nextsample(x, et, t)
         print()
+        self.denoizer.load_state_dict(state)
         return x
 
     def ddpmnextsample(self, x, et, t):

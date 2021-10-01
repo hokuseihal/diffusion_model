@@ -66,7 +66,7 @@ def maketfrecord(re_imgpath, tfrpath):
         example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
         return example_proto.SerializeToString()
     with tf.io.TFRecordWriter(tfrpath) as writer:
-        for path in glob.glob(re_imgpath)[:10]:
+        for path in glob.glob(re_imgpath):
             print(path)
             with open(path, 'rb') as img:
                 img_str=img.read()

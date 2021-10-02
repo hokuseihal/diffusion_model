@@ -88,8 +88,9 @@ class Diffusion:
     def sample(self, stride, embch, shape=None, x=None):
         assert not (shape is None and x is None)
         self.denoizer.eval()
-        state=self.denoizer.state_dict()
-        self.ema_helper.ema(self.denoizer)
+        if self.ema:
+            state=self.denoizer.state_dict()
+            self.ema_helper.ema(self.denoizer)
         if x is None: x = randn(shape).to(self.device)
         for t in torch.arange(self.n_iter - 1, 1, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
@@ -98,7 +99,8 @@ class Diffusion:
             et = self.denoizer.module(x, ys)
             x = self.nextsample(x, et, t)
         print()
-        self.denoizer.load_state_dict(state)
+        if self.ema:
+            self.denoizer.load_state_dict(state)
         return x
 
     def ddpmnextsample(self, x, et, t):

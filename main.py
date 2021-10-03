@@ -23,7 +23,7 @@ def train():
         global gidx
         gidx+=1
         stat = diffusion.trainbatch(data, gidx)
-        print(f'{gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
+        print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
         if gidx % 2000 == 0:
             U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
                          f'{savefolder}/{epoch}_{gidx}.jpg', s=0.5, m=0.5)

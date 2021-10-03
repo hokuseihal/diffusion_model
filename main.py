@@ -2,9 +2,12 @@ import os
 import pickle as pkl
 import shutil
 
+import cloudpickle
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
+import torchvision.transforms as T
 
 import utils.fid as lfid
 import utils.util as U
@@ -18,13 +21,15 @@ from utils.tfrecord import TFRDataloader
 def train():
     for idx, data in enumerate(loader):
         stat = diffusion.trainbatch(data, idx)
-        print(f'{idx // len(loader)}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if idx % 500 == 0 :#and idx != 0:
+        print(f'{epoch}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
+        if idx % 2000 == 0:
             U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
-                         f'{savefolder}/{idx}.jpg', s=0.5, m=0.5)
+                         f'{savefolder}/{epoch}_{idx}.jpg', s=0.5, m=0.5)
             if (cfg['fid']):
-                fid = check_fid(253)
+                fid = check_fid(2000)
                 pltr.addvalue({'fid': fid}, idx)
+            with open(f'{savefolder}/model.cpkl', 'wb') as f:
+                cloudpickle.dump({'model': diffusion.state_sict(), 'cfg': cfg}, f)
 
 
 @torch.no_grad()
@@ -51,26 +56,45 @@ if __name__ == "__main__":
     parser.add_argument('--device', default='cuda')
     parser.add_argument('--datasetpath', default='../data/')
     parser.add_argument('--savefolder', default='tmp')
+    parser.add_argument('--loadckpt', default=False, action='store_true')
     args = parser.parse_args()
 
-    with open(args.model) as file:
-        cfg = yaml.safe_load(file)
-    device = args.device
-    os.makedirs('result', exist_ok=True)
     savefolder = f'result/{args.savefolder}'
-    shutil.rmtree(savefolder, ignore_errors=True)
-    os.mkdir(savefolder)
-    if cfg['epoch'] == -1:
-        cfg['epoch'] = int(500000 / 202589 * cfg['batchsize'])*cfg['diffusion']['subdivision']
+    device = args.device
+    if args.loadckpt:
+        with open(f'{savefolder}/ckpt', 'rb') as f:
+            ckpt = cloudpickle.load(f)
+            cfg = ckpt['cfg']
+            state_dict = ckpt['model']
+        denoizer = Res_UNet(**cfg['model']).to(device)
+        denoizer.load_state_dict(state_dict)
+    else:
+        with open(args.model) as file:
+            cfg = yaml.safe_load(file)
+        os.makedirs('result', exist_ok=True)
+        shutil.rmtree(savefolder, ignore_errors=True)
+        os.mkdir(savefolder)
+        if cfg['epoch'] == -1:
+            cfg['epoch'] = int(500000 / 202589 * cfg['batchsize']) * cfg['diffusion']['subdivision']
+        denoizer = Res_UNet(**cfg['model']).to(device)
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
-    denoizer = Res_UNet(**cfg['model']).to(device)
-    if device=='cuda':
-        denoizer=torch.nn.DataParallel(denoizer)
-    loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord', epoch=cfg['epoch'],
-                           batch=cfg['batchsize'] // cfg['diffusion']['subdivision'],
-                           size=cfg['model']['size'], s=0.5, m=0.5)
-    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, **cfg['diffusion'])
+    if device == 'cuda':
+        denoizer = torch.nn.DataParallel(denoizer)
+    iscls = False
+    numcls = None
+    if cfg['dataset'] == 'celeba':
+        loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord',
+                               batch=cfg['batchsize'] // cfg['diffusion']['subdivision'],
+                               size=cfg['model']['size'], s=0.5, m=0.5)
+    elif cfg['dataset'] == 'stl10':
+        loader = torch.utils.data.DataLoader(
+            torchvision.datasets.STL10('../data/', transform=T.Compose([T.Resize(cfg['size']), T.ToTensor()]),
+                                       download=True), num_workers=4, batch_size=cfg['batchsize'])
+        iscls = True
+        numcls = 10
+    diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, iscls=iscls, numcls=numcls,
+                          **cfg['diffusion'])
     xT = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
         device)
     inception = fid_inception_v3().to(device)
@@ -80,4 +104,5 @@ if __name__ == "__main__":
         realmu = realmu.to(device)
     pltr = Plotter(f'{savefolder}/graph.jpg')
 
-    train()
+    for epoch in range(cfg['epoch']):
+        train()

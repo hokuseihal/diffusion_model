@@ -3,8 +3,11 @@ from functools import partial
 
 import numpy as np
 import torch
+import torch.nn as nn
 from torch import randn, randn_like
+
 from model.ema import EMAHelper
+
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 
@@ -31,8 +34,13 @@ def get_timestep_embedding(timesteps, embedding_dim):
 
 
 class Diffusion:
-    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, ema,ema_mu,subdivision,embch=32, n_iter=1000,
+    def __init__(self, denoizer, criterion, schedule, device, lr, eta, amp, g_clip, ema, ema_mu, subdivision, iscls,
+                 numcls, embch=32, n_iter=1000,
                  beta=(1e-4, 2e-2)):
+        self.iscls = iscls
+        if self.iscls:
+            self.clsembed = nn.Embedding(numcls, embch // 2)
+            self.numcls = numcls
         self.subdivision = subdivision
         self.amp = amp
         self.device = device
@@ -43,9 +51,9 @@ class Diffusion:
         self.optimizer = torch.optim.Adam(self.denoizer.parameters(), lr=lr)
         self.n_iter = n_iter
         self.nextsample = partial(self.ddimnextsample, eta=eta)
-        self.ema=ema
+        self.ema = ema
         if self.ema:
-            self.ema_helper=EMAHelper(ema_mu)
+            self.ema_helper = EMAHelper(ema_mu)
             self.ema_helper.register(denoizer)
         # TODO need debug
         if schedule == 'cos':
@@ -61,12 +69,18 @@ class Diffusion:
         self.g_clip = g_clip
         self.scaler = torch.cuda.amp.GradScaler()
 
+    def state_sict(self):
+        return self.ema_helper.state_dict() if self.ema else self.denoizer.state_dict()
+
     def trainbatch(self, x, idx):
         self.denoizer.train()
         B, C, H, W = x.shape
-        x = x.to(self.device)
         T = torch.randint(self.n_iter, (B,))
-        t = get_timestep_embedding(T, self.embch).to(self.device)
+        t = get_timestep_embedding(T, self.embch if not self.iscls else self.embch // 2).to(self.device)
+        if self.iscls:
+            x, cls = x
+            t = torch.cat([t, self.clsembd(cls)])
+        x = x.to(self.device)
         e = randn_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
         target = e
@@ -89,13 +103,18 @@ class Diffusion:
         assert not (shape is None and x is None)
         self.denoizer.eval()
         if self.ema:
-            state=self.denoizer.state_dict()
+            state = self.denoizer.state_dict()
             self.ema_helper.ema(self.denoizer)
         if x is None: x = randn(shape).to(self.device)
+        B, C, H, W = x.shape
+        if self.iscls:
+            cls = torch.arange(self.numcls).repeat(B // self.numcls)
+            clsemb = self.clsembed(cls)
         for t in torch.arange(self.n_iter - 1, 1, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
-            ys = get_timestep_embedding(t.view(1), embch).to(self.device)
-            #TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.
+            ys = get_timestep_embedding(t.view(1), embch if not self.iscls else embch // 2).to(self.device)
+            if self.iscls: ys = torch.cat([ys, clsemb])
+            # TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.
             et = self.denoizer.module(x, ys)
             x = self.nextsample(x, et, t)
         print()

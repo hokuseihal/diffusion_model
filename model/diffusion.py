@@ -39,7 +39,7 @@ class Diffusion:
                  beta=(1e-4, 2e-2)):
         self.iscls = iscls
         if self.iscls:
-            self.clsembed = nn.Embedding(numcls, embch // 2)
+            self.clsembd = nn.Embedding(numcls, embch // 2)
             self.numcls = numcls
         self.subdivision = subdivision
         self.amp = amp
@@ -74,12 +74,12 @@ class Diffusion:
 
     def trainbatch(self, x, idx):
         self.denoizer.train()
-        B, C, H, W = x.shape
+        B, C, H, W = x.shape if type(x) == type(torch.ones(1)) else x[0].shape
         T = torch.randint(self.n_iter, (B,))
         t = get_timestep_embedding(T, self.embch if not self.iscls else self.embch // 2).to(self.device)
         if self.iscls:
             x, cls = x
-            t = torch.cat([t, self.clsembd(cls)])
+            t = torch.cat([t, self.clsembd(cls).to(self.device)], dim=1)
         x = x.to(self.device)
         e = randn_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
@@ -108,12 +108,12 @@ class Diffusion:
         if x is None: x = randn(shape).to(self.device)
         B, C, H, W = x.shape
         if self.iscls:
-            cls = torch.arange(self.numcls).repeat(B // self.numcls)
-            clsemb = self.clsembed(cls)
+            cls=torch.randint(0,self.numcls,(1,))
+            clsemb = self.clsembd(cls).to(self.device)
         for t in torch.arange(self.n_iter - 1, 1, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch if not self.iscls else embch // 2).to(self.device)
-            if self.iscls: ys = torch.cat([ys, clsemb])
+            if self.iscls: ys = torch.cat([ys, clsemb],dim=1)
             # TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.
             et = self.denoizer.module(x, ys)
             x = self.nextsample(x, et, t)

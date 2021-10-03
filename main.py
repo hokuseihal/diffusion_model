@@ -19,15 +19,17 @@ from utils.tfrecord import TFRDataloader
 
 
 def train():
-    for idx, data in enumerate(loader):
-        stat = diffusion.trainbatch(data, idx)
-        print(f'{epoch}/{cfg["epoch"]} {idx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if idx % 2000 == 0:
+    for data in loader:
+        global gidx
+        gidx+=1
+        stat = diffusion.trainbatch(data, gidx)
+        print(f'{gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
+        if gidx % 2000 == 0:
             U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
-                         f'{savefolder}/{epoch}_{idx}.jpg', s=0.5, m=0.5)
+                         f'{savefolder}/{epoch}_{gidx}.jpg', s=0.5, m=0.5)
             if (cfg['fid']):
                 fid = check_fid(2000)
-                pltr.addvalue({'fid': fid}, idx)
+                pltr.addvalue({'fid': fid}, gidx)
             with open(f'{savefolder}/model.cpkl', 'wb') as f:
                 cloudpickle.dump({'model': diffusion.state_sict(), 'cfg': cfg}, f)
 
@@ -104,5 +106,6 @@ if __name__ == "__main__":
         realmu = realmu.to(device)
     pltr = Plotter(f'{savefolder}/graph.jpg')
 
+    gidx=0
     for epoch in range(cfg['epoch']):
         train()

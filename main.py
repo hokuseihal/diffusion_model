@@ -76,8 +76,6 @@ if __name__ == "__main__":
         os.makedirs('result', exist_ok=True)
         shutil.rmtree(savefolder, ignore_errors=True)
         os.mkdir(savefolder)
-        if cfg['epoch'] == -1:
-            cfg['epoch'] = int(500000 / 202589 * cfg['batchsize']) * cfg['diffusion']['subdivision']
         denoizer = Res_UNet(**cfg['model']).to(device)
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
@@ -89,12 +87,16 @@ if __name__ == "__main__":
         loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord',
                                batch=cfg['batchsize'] // cfg['diffusion']['subdivision'],
                                size=cfg['model']['size'], s=0.5, m=0.5)
+        numimg=202589
     elif cfg['dataset'] == 'stl10':
         loader = torch.utils.data.DataLoader(
             torchvision.datasets.STL10('../data/', transform=T.Compose([T.Resize(cfg['model']['size']), T.ToTensor()]),
                                        download=True), num_workers=4, batch_size=cfg['batchsize'])
         iscls = True
         numcls = 10
+        numimg=157*32
+    if cfg['epoch'] == -1:
+        cfg['epoch'] = int(500000 / numimg * cfg['batchsize']) * cfg['diffusion']['subdivision']
     diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, iscls=iscls, numcls=numcls,
                           **cfg['diffusion'])
     xT = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(

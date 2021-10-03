@@ -26,7 +26,7 @@ def train():
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
         if gidx % 2000 == 0:
             U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
-                         f'{savefolder}/{epoch}_{gidx}.jpg', s=0.5, m=0.5)
+                         f'{savefolder}/{gidx}.jpg', s=0.5, m=0.5)
             if (cfg['fid']):
                 fid = check_fid(2000)
                 pltr.addvalue({'fid': fid}, gidx)

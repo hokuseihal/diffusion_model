@@ -26,7 +26,7 @@ def train():
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
         if gidx % 2000 == 0:
             for stride in cfg['stride']:
-                U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
+                U.save_image(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT),
                              f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
             if (cfg['fid']):
                 fid = check_fid(2000)

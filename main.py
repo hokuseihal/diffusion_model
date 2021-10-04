@@ -90,7 +90,7 @@ if __name__ == "__main__":
         numimg=202589
     elif cfg['dataset'] == 'stl10':
         loader = torch.utils.data.DataLoader(
-            torchvision.datasets.STL10('../data/', transform=T.Compose([T.Resize(cfg['model']['size']), T.ToTensor()]),
+            torchvision.datasets.STL10('../data/', transform=T.Compose([T.Resize(cfg['model']['size']), T.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5]),T.ToTensor()]),
                                        download=True), num_workers=4, batch_size=cfg['batchsize'])
         iscls = True
         numcls = 10

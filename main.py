@@ -25,8 +25,9 @@ def train():
         stat = diffusion.trainbatch(data, gidx)
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
         if gidx % 2000 == 0:
-            U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
-                         f'{savefolder}/{gidx}.jpg', s=0.5, m=0.5)
+            for stride in cfg['stride']:
+                U.save_image(diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=xT),
+                             f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
             if (cfg['fid']):
                 fid = check_fid(2000)
                 pltr.addvalue({'fid': fid}, gidx)
@@ -90,7 +91,7 @@ if __name__ == "__main__":
         numimg=202589
     elif cfg['dataset'] == 'stl10':
         loader = torch.utils.data.DataLoader(
-            torchvision.datasets.STL10('../data/', transform=T.Compose([T.Resize(cfg['model']['size']), T.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5]),T.ToTensor()]),
+            torchvision.datasets.STL10('../data/', transform=T.Compose([T.Resize(cfg['model']['size']), T.ToTensor(),T.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5])]),
                                        download=True), num_workers=4, batch_size=cfg['batchsize'])
         iscls = True
         numcls = 10

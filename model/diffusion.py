@@ -57,17 +57,17 @@ class Diffusion:
             self.ema_helper.register(denoizer)
         # TODO need debug
         if schedule == 'cos':
-            f = lambda t, s=1e-3: np.cos((t / self.n_iter + s) / (1 + s) * np.pi / 2)
-            self.a = (f(torch.linspace(*beta, self.n_iter)) / f(0)).to(self.device)
+            f = lambda t, s=1e-3: np.cos((t / self.n_iter + 1 + s) / (1 + s) * np.pi / 2)
+            self.a = (f(torch.linspace(*beta, self.n_iter + 1)) / f(0)).to(self.device)
             self.b = (
                 torch.clip(1 - self.a / torch.cat([torch.ones(1).to(self.device), self.a[:-1]], dim=-1), 0.999)).to(
                 self.device)
         elif schedule == 'linear':
-            self.b = torch.linspace(*beta, self.n_iter).to(self.device)
+            self.b = torch.linspace(*beta, self.n_iter + 1).to(self.device)
             self.a = torch.cumprod(1 - self.b, -1).to(self.device)
             self._a = 1 - self.b
         elif schedule == 'quadratic':
-            x = torch.linspace(0, 1, self.n_iter)
+            x = torch.linspace(0, 1, self.n_iter + 1)
             self.a = -0.791762 * x ** 2 - 0.135417 * x + 0.985329
         self.g_clip = g_clip
         self.scaler = torch.cuda.amp.GradScaler()
@@ -113,26 +113,26 @@ class Diffusion:
         if self.iscls:
             cls = torch.randint(0, self.numcls, (1,))
             clsemb = self.clsembd(cls).to(self.device)
-        for t in torch.arange(self.n_iter - 1, 1, -stride, dtype=torch.long):
+        for t in torch.arange(self.n_iter // stride * stride - 1, stride, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch if not self.iscls else embch // 2).to(self.device)
             if self.iscls: ys = torch.cat([ys, clsemb], dim=1)
             # TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.
             et = self.denoizer.module(x, ys)
-            x = self.nextsample(x, et, t)
+            x = self.nextsample(x, et, t, stride=stride)
         print()
         if self.ema:
             self.denoizer.load_state_dict(state)
         return x
 
-    def ddpmnextsample(self, x, et, t):
+    def ddpmnextsample(self, x, et, t, stride):
         assert t >= 1
-        c = (1 - self.a[t - 1]) / (1 - self.a[t]) * (1 - self._a[t])
+        c = (1 - self.a[t - stride]) / (1 - self.a[t]) * (1 - self._a[t])
         return 1 / self._a[t].sqrt() * (x - (1 - self._a[t]) / (1 - self.a[t].sqrt()) * et) + c * randn_like(x)
 
-    def ddimnextsample(self, xt, et, t, eta):
-        assert t >= 1
-        c1 = eta * ((1 - self.a[t] / self.a[t - 1]) * (1 - self.a[t - 1]) / (1 - self.a[t])).sqrt()
-        c2 = ((1 - self.a[t - 1]) - c1 ** 2).sqrt()
+    def ddimnextsample(self, xt, et, t, eta, stride):
+        assert t - stride >= 0
+        c1 = eta * ((1 - self.a[t] / self.a[t - stride]) * (1 - self.a[t - stride]) / (1 - self.a[t])).sqrt()
+        c2 = ((1 - self.a[t - stride]) - c1 ** 2).sqrt()
         x0_t = (xt - (1 - self.a[t]).sqrt() * et) / self.a[t].sqrt()
-        return self.a[t - 1].sqrt() * x0_t + c1 * randn_like(xt) + c2 * et
+        return self.a[t - stride].sqrt() * x0_t + c1 * randn_like(xt) + c2 * et

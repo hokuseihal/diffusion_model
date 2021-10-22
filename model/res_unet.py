@@ -9,12 +9,12 @@ class ResBlock(nn.Module):
         outch = in_ch if outch is None else outch
         self.isclsemb = isclsemb
         self.norm1 = nn.GroupNorm(group, in_ch)
-        self.conv1 = nn.Conv2d(in_ch, outch, 3, 1, 1)
+        self.conv1 = nn.Conv3d(in_ch, outch, 3, 1, 1)
         self.emb_proj = nn.Linear(embch, outch)
         self.norm2 = nn.GroupNorm(group, outch)
         self.dropout = nn.Dropout(dropout)
-        self.conv2 = nn.Conv2d(outch, outch, 3, 1, 1)
-        self.shortcut = nn.Conv2d(in_ch, outch, 1, 1, 0)
+        self.conv2 = nn.Conv3d(outch, outch, 3, 1, 1)
+        self.shortcut = nn.Conv3d(in_ch, outch, 1, 1, 0)
         self.activate = activate
 
     def forward(self, x, emb):
@@ -22,7 +22,7 @@ class ResBlock(nn.Module):
         x = self.norm1(x)
         x = self.activate(x)
         x = self.conv1(x)
-        emb = self.emb_proj(self.activate(emb))[:, :, None, None]
+        emb = self.emb_proj(self.activate(emb))[:, :, None, None,None]
         if self.isclsemb:
             temb, cemb = emb.chunk(2)
             x = (1 + temb) * x + cemb
@@ -39,18 +39,19 @@ class AttnBlock(nn.Module):
     def __init__(self, feature, nhead=4):
         super(AttnBlock, self).__init__()
         self.feature = torch.tensor(feature)
-        self.v = nn.Conv2d(feature, feature, 1)
-        self.q = nn.Conv2d(feature, feature, 1)
-        self.k = nn.Conv2d(feature, feature, 1)
-        self.out = nn.Conv2d(feature, feature, 1)
+        self.v = nn.Conv3d(feature, feature, 1)
+        self.q = nn.Conv3d(feature, feature, 1)
+        self.k = nn.Conv3d(feature, feature, 1)
+        self.out = nn.Conv3d(feature, feature, 1)
         # self.attn = nn.TransformerEncoderLayer(feature, nhead, activation='gelu', dim_feedforward=dimff)
         self.norm = nn.GroupNorm(32, feature)
 
     def forward(self, x):
         _x = x
         x = self.norm(x)
-        return _x + self.out(torch.einsum('bhwnm,bcnm->bchw', F.softmax(
-            torch.einsum('bchw,bcij->bhwij', self.q(x), self.k(x)) / self.feature.float().sqrt()), self.v(x)))
+        # TODO remake for 3D
+        return _x + self.out(torch.einsum('bthwijk,bcijk->bcthw', F.softmax(
+            torch.einsum('bcthw,bcijk->bthwijk', self.q(x), self.k(x)) / self.feature.float().sqrt()), self.v(x)))
 
 
 class Res_AttnBlock(nn.Module):
@@ -80,7 +81,7 @@ class Res_UNet(nn.Module):
         )
         _res_ch = lambda ch, outch=None: ResBlock(in_ch=ch, outch=outch, embch=embch, activate=activate, group=group,
                                                   isclsemb=isclsemb, dropout=dropout)
-        self.convin = nn.Conv2d(in_ch, feature, 3, 1, 1)
+        self.convin = nn.Conv3d(in_ch, feature, 3, 1, 1)
         bottle = [
             _res_ch(feature * chs[-1]),
             _res_ch(feature * chs[-1])]
@@ -106,7 +107,7 @@ class Res_UNet(nn.Module):
         self.out = nn.Sequential(
             nn.GroupNorm(group, feature * chs[0]),
             activate,
-            nn.Conv2d(feature * chs[0], out_ch, 3, 1, 1)
+            nn.Conv3d(feature * chs[0], out_ch, 3, 1, 1)
         )
 
     def forward(self, x, emb):
@@ -117,22 +118,20 @@ class Res_UNet(nn.Module):
         for idx, l in enumerate(self.down):
             x = l(x, emb)
             skips.append(x)
-            if idx < len(self.down) - 1: x = F.interpolate(x, scale_factor=0.5, mode='bilinear')
+            if idx < len(self.down) - 1: x = F.interpolate(x, scale_factor=0.5, mode='trilinear')
         for idx, l in enumerate(self.up):
             tmp = skips.pop(-1)
             x = l(torch.cat([x, tmp], dim=1), emb)
-            if idx < len(self.up) - 1: x = F.interpolate(x, scale_factor=2, mode='bilinear')
+            if idx < len(self.up) - 1: x = F.interpolate(x, scale_factor=2, mode='trilinear')
         x = self.out(x)
         return x
 
 
 if __name__ == '__main__':
-    device = 'cuda'
-    m = Res_UNet(in_ch=3, feature=128, size=128, embch=64).to(device)
+    device = 'cpu'
+    m = Res_UNet(in_ch=3, feature=128, size=64, embch=64, bottle_attn=True,attn_res=[16],chs=(1,1,2,2,4)).to(device)
     print(m)
-    with torch.cuda.amp.autocast():
-        x = torch.randn(8, 3, 64, 64).to(device)
-        temb = torch.randn(8, 64).to(device)
-        output = m(x, temb)
-        print(output.dtype)
+    x = torch.randn(8, 3, 16, 64, 64).to(device)
+    temb = torch.randn(8, 64).to(device)
+    output = m(x, temb)
     print(output.shape)

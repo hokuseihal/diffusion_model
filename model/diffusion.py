@@ -77,7 +77,7 @@ class Diffusion:
 
     def trainbatch(self, x, idx):
         self.denoizer.train()
-        B, C, H, W = x.shape if type(x) == type(torch.ones(1)) else x[0].shape
+        B, C, Tf, H, W = x.shape if type(x) == type(torch.ones(1)) else x[0].shape
         T = torch.randint(self.n_iter, (B,))
         t = get_timestep_embedding(T, self.embch if not self.iscls else self.embch // 2).to(self.device)
         if self.iscls:
@@ -85,7 +85,7 @@ class Diffusion:
             t = torch.cat([t, self.clsembd(cls).to(self.device)], dim=1)
         x = x.to(self.device)
         e = randn_like(x).to(self.device)
-        xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
+        xt = self.a[T].view(-1, 1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1, 1)).sqrt() * e
         target = e
         output = self.denoizer(xt, t)
         loss = self.criterion(target, output)
@@ -109,7 +109,6 @@ class Diffusion:
             state = self.denoizer.state_dict()
             self.ema_helper.ema(self.denoizer)
         if x is None: x = randn(shape).to(self.device)
-        B, C, H, W = x.shape
         if self.iscls:
             cls = torch.randint(0, self.numcls, (1,))
             clsemb = self.clsembd(cls).to(self.device)

@@ -29,7 +29,7 @@ def train():
             for stride in cfg['stride']:
                 # U.save_image(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT),
                 #              f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
-                videoout = diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT)
+                videoout = diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT).cpu()*0.5+0.5
                 for b in range(cfg['samplebatchsize']):
                     UD.writevideo(videoout[b], f'{savefolder}/{gidx}_{stride}_{b}.mp4', fps)
             if (cfg['fid']):

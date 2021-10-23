@@ -14,7 +14,7 @@ class UCF101Dataset:
         return len(self.path)
 
     def __getitem__(self, idx):
-        return U.readvideo(path=self.path[idx], stride=self.stride, numframe=self.numframe, size=self.size)
+        return (U.readvideo(path=self.path[idx], stride=self.stride, numframe=self.numframe, size=self.size)-0.5)/0.5
 
 
 if __name__ == '__main__':

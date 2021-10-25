@@ -36,17 +36,22 @@ class ResBlock(nn.Module):
 
 
 class AttnBlock(nn.Module):
-    def __init__(self, feature, dimff=None, nhead=4, ):
+    def __init__(self, feature, dimff=None, nhead=4, resize=8):
         super(AttnBlock, self).__init__()
         if dimff is None: dimff = feature
+        self.resize = resize
         self.attn = nn.TransformerEncoderLayer(feature, nhead, activation='gelu', dim_feedforward=dimff)
 
     def forward(self, x):
+        _x = x
+        shape = x.shape
+        if self.resize: x = F.interpolate(x, self.resize)
         B, C, H, W = x.shape
         x = x.view(B, C, H * W).permute(2, 0, 1)
         x = self.attn(x)
         x = x.permute(1, 2, 0).view(B, C, H, W)
-        return x
+        if self.resize: x = F.interpolate(x, shape[-2:])
+        return _x + x
 
 
 class Res_AttnBlock(nn.Module):
@@ -118,17 +123,18 @@ class Res_UNet(nn.Module):
             tmp = skips.pop(-1)
             x = l(torch.cat([x, tmp], dim=1), emb)
             if idx < len(self.up) - 1: x = F.interpolate(x, scale_factor=2, mode='bilinear')
-        x=self.out(x)
+        x = self.out(x)
         return x
 
 
 if __name__ == '__main__':
-    with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-                                profile_memory=True) as p:
-        m = Res_UNet(in_ch=3, feature=128, size=128, embch=64).cuda()
-        print(m)
-        x = torch.randn(8, 3, 64, 64).cuda()
-        temb = torch.randn(8, 64).cuda()
-        output = m(x, temb)
-        print(output.shape)
-    print(p.key_averages())
+    # with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+    #                             profile_memory=True) as p:
+    size=256
+    m = Res_UNet(in_ch=3, feature=32, size=size, embch=64,chs=(1,1,1,2),).cuda()
+    print(m)
+    x = torch.randn(1, 3, size,size).cuda()
+    temb = torch.randn(8, 64).cuda()
+    output = m(x, temb)
+    print(output.shape)
+    # print(p.key_averages())

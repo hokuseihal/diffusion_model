@@ -3,6 +3,58 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class DeepRes(nn.Module):
+    def __init__(self, in_ch, feature, scale):
+        super(DeepRes, self).__init__()
+        self.scale = scale
+        self.conv1_1 = nn.Conv2d(in_ch, feature, 1)
+        self.conv1_2 = nn.Conv2d(feature, in_ch, 1)
+        self.conv3_1 = nn.Conv2d(feature, feature, 3, 1, 1)
+        self.conv3_2 = nn.Conv2d(feature, feature, 3, 1, 1)
+        self.norm1 = nn.GroupNorm(1, in_ch)
+        self.norm2 = nn.GroupNorm(1, feature)
+        self.norm3 = nn.GroupNorm(1, feature)
+        self.norm4 = nn.GroupNorm(1, feature)
+        self.feture = feature
+
+    def forward(self, x):
+        _x = F.interpolate(x, scale_factor=self.scale)
+        x = self.norm1(x)
+        x = F.hardswish(x)
+        x = self.conv1_1(x)
+        x = self.norm2(x)
+        x = F.hardswish(x)
+        x = F.interpolate(x, scale_factor=self.scale)
+        x = self.conv3_1(x)
+        x = self.norm3(x)
+        x = F.hardswish(x)
+        x = self.conv3_2(x)
+        x = self.norm4(x)
+        x = F.hardswish(x)
+        x = self.conv1_2(x)
+        return x + _x
+
+
+class Hopper(nn.Module):
+    def __init__(self, times, in_ch, feature, scale):
+        super(Hopper, self).__init__()
+
+        def layers():
+            ret = [nn.GroupNorm(1, feature),
+                   nn.Hardswish(),
+                   nn.Conv2d(feature, feature, 3, 1, 1)]
+            ret.insert(-1 if scale == 0.5 else -2, nn.Upsample(scale_factor=scale, mode='bilinear'))
+            return ret
+
+        self.layers = []
+        for _ in range(times):
+            self.layers.extend([DeepRes(in_ch=in_ch, feature=feature, scale=scale)])
+        self.layers = nn.Sequential(*self.layers)
+
+    def forward(self, x):
+        return self.layers(x)
+
+
 class ResBlock(nn.Module):
     def __init__(self, in_ch, embch, dropout, outch, group, isclsemb, activate):
         super(ResBlock, self).__init__()
@@ -71,8 +123,9 @@ class Res_UNet(nn.Module):
     def __init__(self, in_ch, feature, embch, size, bottle_attn, activate=nn.Hardswish(), attn_res=(), chs=(1, 2, 4),
                  num_res_block=1,
                  dropout=0, group=32,
-                 isclsemb=False, out_ch=3):
+                 isclsemb=False, out_ch=3, hopper=False, hopper_ch=8):
         super(Res_UNet, self).__init__()
+        self.hopper = hopper
         self.emb = nn.Sequential(
             nn.Conv1d(embch, embch, 1, groups=2 if isclsemb else 1),
             activate,
@@ -103,6 +156,9 @@ class Res_UNet(nn.Module):
             self.down.append(Res_AttnBlock(_down))
             self.up.insert(0, Res_AttnBlock(_up))
             res //= 2
+        self.hopper_down = Hopper(times=3, in_ch=3, feature=hopper_ch,
+                                  scale=0.5) if hopper else nn.Sequential()
+        self.hopper_up = Hopper(times=3, in_ch=3, feature=hopper_ch, scale=2) if hopper else nn.Sequential()
         self.out = nn.Sequential(
             nn.GroupNorm(group, feature * chs[0]),
             activate,
@@ -113,6 +169,7 @@ class Res_UNet(nn.Module):
         skips = []
 
         emb = self.emb(emb[:, :, None])[:, :, 0]
+        x = self.hopper_down(x)
         x = self.convin(x)
         for idx, l in enumerate(self.down):
             x = l(x, emb)
@@ -123,16 +180,20 @@ class Res_UNet(nn.Module):
             x = l(torch.cat([x, tmp], dim=1), emb)
             if idx < len(self.up) - 1: x = F.interpolate(x, scale_factor=2, mode='bilinear')
         x = self.out(x)
+        x = self.hopper_up(x)
         return x
 
 
 if __name__ == '__main__':
-    device = 'cuda'
-    m = Res_UNet(in_ch=3, feature=128, size=128, embch=64).to(device)
-    print(m)
-    with torch.cuda.amp.autocast():
-        x = torch.randn(8, 3, 64, 64).to(device)
-        temb = torch.randn(8, 64).to(device)
+    with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+                                profile_memory=True) as p:
+        size = 512
+        batchsize = 8
+        m = Res_UNet(in_ch=3, feature=128, size=size, embch=64, chs=(1, 1, 1, 2), hopper=True,
+                     attn_res=(32, 16, 8)).cuda()
+        print(m)
+        x = torch.randn(batchsize, 3, size, size).cuda()
+        temb = torch.randn(batchsize, 64).cuda()
         output = m(x, temb)
         print(output.dtype)
     print(output.shape)

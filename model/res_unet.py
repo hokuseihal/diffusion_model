@@ -133,7 +133,7 @@ class Res_UNet(nn.Module):
         )
         _res_ch = lambda ch, outch=None: ResBlock(in_ch=ch, outch=outch, embch=embch, activate=activate, group=group,
                                                   isclsemb=isclsemb, dropout=dropout)
-        self.convin = nn.Conv2d(in_ch, feature, 3, 1, 1)
+        self.convin = nn.Conv2d(in_ch*2, feature, 3, 1, 1)
         bottle = [
             _res_ch(feature * chs[-1]),
             _res_ch(feature * chs[-1])]

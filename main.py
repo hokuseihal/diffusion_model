@@ -19,14 +19,14 @@ from utils.tfrecord import TFRDataloader
 
 
 def train():
-    for data in loader:
+    for idx,data in enumerate(loader):
         global gidx
         gidx+=1
         stat = diffusion.trainbatch(data, gidx)
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if gidx % 2000 == 0:
+        if idx % 2000 == 0:
             for stride in cfg['stride']:
-                U.save_image(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT),
+                U.save_image(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT,img=data),
                              f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
             if (cfg['fid']):
                 fid = check_fid(2000)

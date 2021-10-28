@@ -75,7 +75,13 @@ class Diffusion:
     def state_sict(self):
         return self.ema_helper.state_dict() if self.ema else self.denoizer.state_dict()
 
+    def inpaint(self, x):
+        B, C, H, W = x.shape
+        x[:, :, H // 2:, W // 2:] = 0
+        return x
+
     def trainbatch(self, x, idx):
+
         self.denoizer.train()
         B, C, H, W = x.shape if type(x) == type(torch.ones(1)) else x[0].shape
         T = torch.randint(self.n_iter, (B,))
@@ -87,7 +93,7 @@ class Diffusion:
         e = randn_like(x).to(self.device)
         xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
         target = e
-        output = self.denoizer(xt, t)
+        output = self.denoizer(torch.cat([xt, self.inpaint(x)], dim=1), t)
         loss = self.criterion(target, output)
         (loss / self.subdivision).backward()
         # loss.backward()
@@ -102,7 +108,7 @@ class Diffusion:
         return {'loss': loss.item()}
 
     @torch.no_grad()
-    def sample(self, stride, embch, shape=None, x=None):
+    def sample(self, stride, embch, img, shape=None, x=None):
         assert not (shape is None and x is None)
         self.denoizer.eval()
         if self.ema:
@@ -113,17 +119,18 @@ class Diffusion:
         if self.iscls:
             cls = torch.randint(0, self.numcls, (1,))
             clsemb = self.clsembd(cls).to(self.device)
+        img = self.inpaint(img).to(self.device)
         for t in torch.arange(self.n_iter // stride * stride - 1, stride, -stride, dtype=torch.long):
             print(f'\rsampling:{t}', end='')
             ys = get_timestep_embedding(t.view(1), embch if not self.iscls else embch // 2).to(self.device)
             if self.iscls: ys = torch.cat([ys, clsemb], dim=1)
             # TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.
-            et = self.denoizer.module(x, ys)
+            et = self.denoizer.module(torch.cat([x, img], dim=1), ys)
             x = self.nextsample(x, et, t, stride=stride)
         print()
         if self.ema:
             self.denoizer.load_state_dict(state)
-        return x
+        return torch.cat([x, img], dim=2)
 
     def ddpmnextsample(self, x, et, t, stride):
         assert t >= 1

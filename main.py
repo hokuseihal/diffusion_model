@@ -32,7 +32,7 @@ def train():
                 pltr.addvalue({'fid': fid}, gidx)
             torch.save(denoizer.module.state_dict(),f'{savefolder}/model.pth')
             with open(f'{savefolder}/epoch.txt','w') as f:
-                f.write(f'{epoch}')
+                f.write(f'{epoch},{gidx}')
 
 
 @torch.no_grad()
@@ -73,10 +73,11 @@ if __name__ == "__main__":
         cfg = yaml.safe_load(file)
     denoizer = Res_UNet(**cfg['model']).to(device)
     startepoch=0
+    gidx=0
     if args.restart:
         denoizer.load_state_dict(torch.load(f'{savefolder}/model.pth'))
         with open(f'{savefolder}/epoch.txt') as f:
-            startepoch=int(f.read().strip())
+            startepoch,gidx=list(map(int,f.read().strip().split(',')))
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
     if device == 'cuda':
@@ -108,6 +109,5 @@ if __name__ == "__main__":
         realmu = realmu.to(device)
     pltr = Plotter(f'{savefolder}/graph.jpg')
 
-    gidx=0
     for epoch in range(startepoch,cfg['epoch']):
         train()

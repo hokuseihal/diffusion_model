@@ -46,7 +46,7 @@ def check_fid(num_image):
         x = F.interpolate(x, (299, 299))
         mvci.iter(inception(x))
     fid = lfid.fid(realsigma, realmu, *mvci.get(isbias=True))
-    print(f'{fid=}')
+    print(f'fid:{fid}')
     return fid
 
 

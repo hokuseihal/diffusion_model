@@ -2,7 +2,6 @@ import os
 import pickle as pkl
 import shutil
 
-import cloudpickle
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -31,8 +30,9 @@ def train():
             if (cfg['fid']):
                 fid = check_fid(2000)
                 pltr.addvalue({'fid': fid}, gidx)
-            with open(f'{savefolder}/model.cpkl', 'wb') as f:
-                cloudpickle.dump({'model': diffusion.state_sict(), 'cfg': cfg}, f)
+            torch.save(denoizer.module.state_dict(),f'{savefolder}/model.pth')
+            with open(f'{savefolder}/epoch.txt','w') as f:
+                f.write(f'{epoch}')
 
 
 @torch.no_grad()
@@ -59,25 +59,24 @@ if __name__ == "__main__":
     parser.add_argument('--device', default='cuda')
     parser.add_argument('--datasetpath', default='../data/')
     parser.add_argument('--savefolder', default='tmp')
-    parser.add_argument('--loadckpt', default=False, action='store_true')
+    parser.add_argument('--restart', default=False, action='store_true')
     args = parser.parse_args()
 
     savefolder = f'result/{args.savefolder}'
     device = args.device
-    if args.loadckpt:
-        with open(f'{savefolder}/ckpt', 'rb') as f:
-            ckpt = cloudpickle.load(f)
-            cfg = ckpt['cfg']
-            state_dict = ckpt['model']
-        denoizer = Res_UNet(**cfg['model']).to(device)
-        denoizer.load_state_dict(state_dict)
-    else:
-        with open(args.model) as file:
-            cfg = yaml.safe_load(file)
+    if not args.restart:
         os.makedirs('result', exist_ok=True)
         shutil.rmtree(savefolder, ignore_errors=True)
         os.mkdir(savefolder)
-        denoizer = Res_UNet(**cfg['model']).to(device)
+        shutil.copy(args.model, f'{savefolder}/cfg.yaml')
+    with open(f'{savefolder}/cfg.yaml') as file:
+        cfg = yaml.safe_load(file)
+    denoizer = Res_UNet(**cfg['model']).to(device)
+    startepoch=0
+    if args.restart:
+        denoizer.load_state_dict(torch.load(f'{savefolder}/model.pth'))
+        with open(f'{savefolder}/epoch.txt') as f:
+            startepoch=int(f.read().strip())
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
     if device == 'cuda':
@@ -110,5 +109,5 @@ if __name__ == "__main__":
     pltr = Plotter(f'{savefolder}/graph.jpg')
 
     gidx=0
-    for epoch in range(cfg['epoch']):
+    for epoch in range(startepoch,cfg['epoch']):
         train()

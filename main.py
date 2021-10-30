@@ -19,7 +19,7 @@ from utils.tfrecord import TFRDataloader
 
 def train():
     global gidx
-    for data in loader:
+    for idx,data in enumerate(loader):
         gidx+=1
         stat = diffusion.trainbatch(data, gidx)
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')

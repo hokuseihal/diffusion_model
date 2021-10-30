@@ -18,8 +18,8 @@ from utils.tfrecord import TFRDataloader
 
 
 def train():
+    global gidx
     for data in loader:
-        global gidx
         gidx+=1
         stat = diffusion.trainbatch(data, gidx)
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
@@ -30,9 +30,9 @@ def train():
             if (cfg['fid']):
                 fid = check_fid(2000)
                 pltr.addvalue({'fid': fid}, gidx)
-            torch.save(denoizer.module.state_dict(),f'{savefolder}/model.pth')
-            with open(f'{savefolder}/epoch.txt','w') as f:
-                f.write(f'{epoch},{gidx}')
+    torch.save(denoizer.module.state_dict(),f'{savefolder}/model.pth')
+    with open(f'{savefolder}/epoch.txt','w') as f:
+        f.write(f'{epoch},{gidx}')
 
 
 @torch.no_grad()

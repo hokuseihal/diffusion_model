@@ -1,0 +1,31 @@
+n_iter: 1000
+type: ddpm
+loss: mse
+epoch: -1
+batchsize: 8
+stride: [100]
+samplebatchsize: 8
+fid: False
+dataset: celeba
+diffusion:
+  eta: 0
+  g_clip: 1.0
+  schedule: linear
+  lr: 0.0001
+  amp: False
+  subdivision: 1
+  ema: True
+  ema_mu: 0.999
+model:
+  in_ch: 3
+  feature: 32
+  embch: 32
+  size: 64
+  attn_res: [8 ]
+  chs: [ 1,1,2,2,4 ]
+  num_res_block: 2
+  bottle_attn: True
+  isclsemb: False
+  dropout: 0
+  group: 4
+  out_ch: 3

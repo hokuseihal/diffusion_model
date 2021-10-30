@@ -59,13 +59,14 @@ if __name__ == "__main__":
     parser.add_argument('--device', default='cuda')
     parser.add_argument('--datasetpath', default='../data/')
     parser.add_argument('--savefolder', default='tmp')
+    parser.add_argument('--savefolderbase',default='.')
     parser.add_argument('--restart', default=False, action='store_true')
     args = parser.parse_args()
 
-    savefolder = f'result/{args.savefolder}'
+    savefolder = f'{args.savefolderbase}/result/{args.savefolder}'
     device = args.device
     if not args.restart:
-        os.makedirs('result', exist_ok=True)
+        os.makedirs(f'{args.savefolderbase}/result', exist_ok=True)
         shutil.rmtree(savefolder, ignore_errors=True)
         os.mkdir(savefolder)
         shutil.copy(args.model, f'{savefolder}/cfg.yaml')

@@ -10,3 +10,4 @@ cloudpickle
 av
 matplotlib
 wandb
+pytest

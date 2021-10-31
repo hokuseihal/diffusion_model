@@ -7,10 +7,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as T
-import wandb
 
 import utils.fid as lfid
 import utils.util as U
+import wandb
 from model.diffusion import Diffusion
 from model.res_unet import Res_UNet
 from plotter import Plotter
@@ -63,6 +63,7 @@ if __name__ == "__main__":
     parser.add_argument('--datasetpath', default='../data/')
     parser.add_argument('--savefolder', default='tmp')
     parser.add_argument('--savefolderbase', default='.')
+    parser.add_argument('--changecfg', default='')
     parser.add_argument('--restart', default=False, action='store_true')
     args = parser.parse_args()
 
@@ -75,6 +76,9 @@ if __name__ == "__main__":
         shutil.copy(args.model, f'{savefolder}/cfg.yaml')
     with open(f'{savefolder}/cfg.yaml') as file:
         cfg = yaml.safe_load(file)
+    cfg = U.setcfg(cfg, args.changecfg)
+    with open(f'{savefolder}/cfg.yaml', 'w') as f:
+        yaml.dump(cfg, f)
     denoizer = Res_UNet(**cfg['model']).to(device)
     startepoch = 0
     gidx = 0
@@ -113,7 +117,8 @@ if __name__ == "__main__":
         realsigma = realsigma.to(device)
         realmu = realmu.to(device)
     pltr = Plotter(f'{savefolder}/graph.jpg')
-    wandb.init(project=args.savefolder)
+    wandb.init(project='main')
+    wandb.run.name = args.savefolder
     wandb.config = cfg
     for epoch in range(startepoch, cfg['epoch']):
         train()

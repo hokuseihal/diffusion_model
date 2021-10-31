@@ -1,4 +1,5 @@
 import pickle as pkl
+import re
 
 import torch
 import torchvision.utils as tvu
@@ -6,13 +7,14 @@ import torchvision.utils as tvu
 from utils.fid import MeanCoVariance_iter
 from utils.gtmodel import fid_inception_v3
 from utils.tfrecord import TFRDataloader
-import re
+
 
 def save_image(x, path, s=1, m=0):
     tvu.save_image(x * s + m, path)
 
-def make_grid(x,s=1,m=0):
-    return tvu.make_grid(x*s+m)
+
+def make_grid(x, s=1, m=0):
+    return tvu.make_grid(x * s + m)
 
 
 def make_gt_inception(model, loader, device='cuda'):
@@ -62,24 +64,35 @@ class iterrepeater:
         except StopIteration:
             self.itr = iter(range(5))
             raise StopIteration
+
+
 def autocvt(s):
-    if re.fullmatch(r'[+-]?\d+',s):
+    s = s.replace(' ', '').strip()
+    if re.fullmatch(r'[+-]?\d+', s):
         return int(s)
-    elif re.fullmatch(r'[+-]?\d+(?:\.\d+)?',s):
+    elif re.fullmatch(r'[+-]?\d+(?:\.\d+)?', s):
         return float(s)
-    elif re.fullmatch(r'(True|False)',s):
-        return s=='True'
+    elif re.fullmatch(r'(True|False)', s):
+        return s == 'True'
+    elif re.fullmatch(r'\[(.,*)*\]', s):
+        ret = []
+        for v in s[1:-1].split(','):
+            ret.append(autocvt(v))
+        return ret
     else:
         return s
 
-def setcfg(cfg,kvs):
-    for kv in kvs.split(','):
+
+def setcfg(cfg, kvs):
+    for kv in kvs.split('|'):
         keys, value = kv.split(':')
         _cfg = cfg
         for key in keys.split('/')[:-1]:
             _cfg = _cfg[key]
         _cfg[keys.split('/')[-1]] = autocvt(value)
     return cfg
+
+
 if __name__ == '__main__':
     # makefidpkl=True
     # if(makefidpkl):
@@ -87,4 +100,4 @@ if __name__ == '__main__':
     I = iterrepeater()
     for e in range(4):
         for i in I:
-            print(e,i)
+            print(e, i)

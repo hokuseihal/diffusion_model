@@ -162,7 +162,7 @@ class Res_UNet(nn.Module):
         self.out = nn.Sequential(
             nn.GroupNorm(group, feature * chs[0]),
             activate,
-            nn.Conv2d(feature * chs[0], out_ch, 3, 1, 1)
+            nn.Conv2d(feature * chs[0], out_ch*2, 3, 1, 1)
         )
 
     def forward(self, x, emb):

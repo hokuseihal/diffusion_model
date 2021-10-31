@@ -1,5 +1,4 @@
 import math
-from functools import partial
 
 import numpy as np
 import torch
@@ -50,7 +49,7 @@ class Diffusion:
         self.embch = embch
         self.optimizer = torch.optim.Adam(self.denoizer.parameters(), lr=lr)
         self.n_iter = n_iter
-        self.nextsample = partial(self.ddimnextsample, eta=eta)
+        self.nextsample = self.gentlenextsample
         self.ema = ema
         if self.ema:
             self.ema_helper = EMAHelper(ema_mu)
@@ -85,9 +84,10 @@ class Diffusion:
             t = torch.cat([t, self.clsembd(cls).to(self.device)], dim=1)
         x = x.to(self.device)
         e = randn_like(x).to(self.device)
-        xt = self.a[T].view(-1, 1, 1, 1).sqrt() * x + (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
-        target = e
-        output = self.denoizer(xt, t)
+        xt_x = self.a[T].view(-1, 1, 1, 1).sqrt() * x
+        xt_e = (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
+        target = torch.cat([xt_x, xt_e], dim=1)
+        output = self.denoizer(xt_x + xt_e, t)
         loss = self.criterion(target, output)
         (loss / self.subdivision).backward()
         # loss.backward()
@@ -118,8 +118,8 @@ class Diffusion:
             ys = get_timestep_embedding(t.view(1), embch if not self.iscls else embch // 2).to(self.device)
             if self.iscls: ys = torch.cat([ys, clsemb], dim=1)
             # TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.
-            et = self.denoizer.module(x, ys)
-            x = self.nextsample(x, et, t, stride=stride)
+            xt_x, xt_e = self.denoizer.module(x, ys).chunk(2, dim=1)
+            x = self.nextsample(xt_x=xt_x, xt_e=xt_e, t=t, stride=stride)
         print()
         if self.ema:
             self.denoizer.load_state_dict(state)
@@ -136,3 +136,8 @@ class Diffusion:
         c2 = ((1 - self.a[t - stride]) - c1 ** 2).sqrt()
         x0_t = (xt - (1 - self.a[t]).sqrt() * et) / self.a[t].sqrt()
         return self.a[t - stride].sqrt() * x0_t + c1 * randn_like(xt) + c2 * et
+
+    def gentlenextsample(self, xt_x, xt_e, t, stride):
+        assert t - stride >= 0
+        return (self.a[t - stride] / self.a[t]).sqrt() * xt_x \
+               + ((1 - self.a[t - stride]) / (1 - self.a[t])).sqrt() * xt_e

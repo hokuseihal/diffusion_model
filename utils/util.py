@@ -11,6 +11,9 @@ from utils.tfrecord import TFRDataloader
 def save_image(x, path, s=1, m=0):
     tvu.save_image(x * s + m, path)
 
+def make_grid(x,s=1,m=0):
+    return tvu.make_grid(x*s+m)
+
 
 def make_gt_inception(model, loader, device='cuda'):
     print('make inception output...')

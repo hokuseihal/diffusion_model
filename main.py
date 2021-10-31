@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as T
+import wandb
 
 import utils.fid as lfid
 import utils.util as U
@@ -19,19 +20,21 @@ from utils.tfrecord import TFRDataloader
 
 def train():
     global gidx
-    for data in loader:
-        gidx+=1
+    for idx, data in enumerate(loader):
+        gidx += 1
         stat = diffusion.trainbatch(data, gidx)
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if gidx % 2000 == 0:
+        wandb.log(stat)
+        if idx % 2000 == 0:
             for stride in cfg['stride']:
-                U.save_image(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT),
-                             f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
+                wandb.log({'output': wandb.Image(
+                    U.make_grid(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT),
+                                s=0.5, m=0.5), caption=f'{gidx}_{stride}')})
             if (cfg['fid']):
                 fid = check_fid(2000)
                 pltr.addvalue({'fid': fid}, gidx)
-    torch.save(denoizer.module.state_dict(),f'{savefolder}/model.pth')
-    with open(f'{savefolder}/epoch.txt','w') as f:
+    torch.save(denoizer.module.state_dict(), f'{savefolder}/model.pth')
+    with open(f'{savefolder}/epoch.txt', 'w') as f:
         f.write(f'{epoch},{gidx}')
 
 
@@ -59,7 +62,7 @@ if __name__ == "__main__":
     parser.add_argument('--device', default='cuda')
     parser.add_argument('--datasetpath', default='../data/')
     parser.add_argument('--savefolder', default='tmp')
-    parser.add_argument('--savefolderbase',default='.')
+    parser.add_argument('--savefolderbase', default='.')
     parser.add_argument('--restart', default=False, action='store_true')
     args = parser.parse_args()
 
@@ -73,12 +76,12 @@ if __name__ == "__main__":
     with open(f'{savefolder}/cfg.yaml') as file:
         cfg = yaml.safe_load(file)
     denoizer = Res_UNet(**cfg['model']).to(device)
-    startepoch=0
-    gidx=0
+    startepoch = 0
+    gidx = 0
     if args.restart:
         denoizer.load_state_dict(torch.load(f'{savefolder}/model.pth'))
         with open(f'{savefolder}/epoch.txt') as f:
-            startepoch,gidx=list(map(int,f.read().strip().split(',')))
+            startepoch, gidx = list(map(int, f.read().strip().split(',')))
     if cfg['loss'] == 'mse':
         criterion = nn.MSELoss()
     if device == 'cuda':
@@ -89,14 +92,15 @@ if __name__ == "__main__":
         loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord',
                                batch=cfg['batchsize'] // cfg['diffusion']['subdivision'],
                                size=cfg['model']['size'], s=0.5, m=0.5)
-        numimg=202589
+        numimg = 202589
     elif cfg['dataset'] == 'stl10':
         loader = torch.utils.data.DataLoader(
-            torchvision.datasets.STL10('../data/', transform=T.Compose([T.Resize(cfg['model']['size']), T.ToTensor(),T.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5])]),
+            torchvision.datasets.STL10('../data/', transform=T.Compose(
+                [T.Resize(cfg['model']['size']), T.ToTensor(), T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])]),
                                        download=True), num_workers=4, batch_size=cfg['batchsize'])
         iscls = True
         numcls = 10
-        numimg=157*32
+        numimg = 157 * 32
     if cfg['epoch'] == -1:
         cfg['epoch'] = int(500000 / numimg * cfg['batchsize']) * cfg['diffusion']['subdivision']
     diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, iscls=iscls, numcls=numcls,
@@ -109,6 +113,8 @@ if __name__ == "__main__":
         realsigma = realsigma.to(device)
         realmu = realmu.to(device)
     pltr = Plotter(f'{savefolder}/graph.jpg')
-
-    for epoch in range(startepoch,cfg['epoch']):
+    wandb.init(project=args.savefolder)
+    wandb.config = cfg
+    for epoch in range(startepoch, cfg['epoch']):
         train()
+    wandb.finish()

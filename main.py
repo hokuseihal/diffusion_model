@@ -24,12 +24,14 @@ def train():
         gidx += 1
         stat = diffusion.trainbatch(data, gidx)
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        wandb.log(stat)
+        if args.use_wandb: wandb.log(stat)
         if idx % 2000 == 0:
             for stride in cfg['stride']:
-                wandb.log({'output': wandb.Image(
-                    U.make_grid(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT),
-                                s=0.5, m=0.5), caption=f'{gidx}_{stride}')})
+                gen_img = U.make_grid(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT), s=0.5, m=0.5)
+                if args.use_wandb:
+                    wandb.log({'output': wandb.Image(gen_img, caption=f'{gidx}_{stride}')})
+                else:
+                    U.save_image(gen_img, f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
             if (cfg['fid']):
                 fid = check_fid(2000)
                 pltr.addvalue({'fid': fid}, gidx)
@@ -63,7 +65,8 @@ if __name__ == "__main__":
     parser.add_argument('--datasetpath', default='../data/')
     parser.add_argument('--savefolder', default='tmp')
     parser.add_argument('--savefolderbase', default='.')
-    parser.add_argument('--changecfg', default=None)
+    parser.add_argument('--changecfg', default='')
+    parser.add_argument('--use_wandb', default=True, action='store_false')
     parser.add_argument('--restart', default=False, action='store_true')
     args = parser.parse_args()
 
@@ -117,9 +120,11 @@ if __name__ == "__main__":
         realsigma = realsigma.to(device)
         realmu = realmu.to(device)
     pltr = Plotter(f'{savefolder}/graph.jpg')
-    wandb.init(project='gentle')
-    wandb.run.name = args.savefolder
-    wandb.config = cfg
+    if args.use_wandb:
+        wandb.init(project='main')
+        wandb.run.name = args.savefolder
+        wandb.config = cfg
     for epoch in range(startepoch, cfg['epoch']):
         train()
-    wandb.finish()
+    if args.use_wandb:
+        wandb.finish()

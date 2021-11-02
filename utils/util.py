@@ -8,7 +8,6 @@ from utils.fid import MeanCoVariance_iter
 from utils.gtmodel import fid_inception_v3
 from utils.tfrecord import TFRDataloader
 
-
 def save_image(x, path, s=1, m=0):
     tvu.save_image(x * s + m, path)
 

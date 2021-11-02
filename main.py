@@ -7,10 +7,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as T
-import wandb
 
 import utils.fid as lfid
 import utils.util as U
+import wandb
 from model.diffusion import Diffusion
 from model.res_unet import Res_UNet
 from plotter import Plotter
@@ -24,11 +24,11 @@ def train():
         gidx += 1
         stat = diffusion.trainbatch(data, gidx)
         print(f'{epoch}/{cfg["epoch"]} {gidx % len(loader)}/{len(loader)} {stat["loss"]:.2}')
-        if args.use_wandb: wandb.log(stat)
+        if use_wandb: wandb.log(stat)
         if idx % 2000 == 0:
             for stride in cfg['stride']:
                 gen_img = U.make_grid(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT), s=0.5, m=0.5)
-                if args.use_wandb:
+                if use_wandb:
                     wandb.log({'output': wandb.Image(gen_img, caption=f'{gidx}_{stride}')})
                 else:
                     U.save_image(gen_img, f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
@@ -66,12 +66,13 @@ if __name__ == "__main__":
     parser.add_argument('--savefolder', default='tmp')
     parser.add_argument('--savefolderbase', default='.')
     parser.add_argument('--changecfg', default='')
-    parser.add_argument('--use_wandb', default=True, action='store_false')
+    parser.add_argument('--dis_wandb', default=False, action='store_true')
     parser.add_argument('--restart', default=False, action='store_true')
     args = parser.parse_args()
 
     savefolder = f'{args.savefolderbase}/result/{args.savefolder}'
     device = args.device
+    use_wandb=not args.dis_wandb
     if not args.restart:
         os.makedirs(f'{args.savefolderbase}/result', exist_ok=True)
         shutil.rmtree(savefolder, ignore_errors=True)
@@ -79,7 +80,7 @@ if __name__ == "__main__":
         shutil.copy(args.model, f'{savefolder}/cfg.yaml')
     with open(f'{savefolder}/cfg.yaml') as file:
         cfg = yaml.safe_load(file)
-    if args.changecfg: cfg = U.setcfg(cfg, args.changecfg)
+    cfg = U.setcfg(cfg, args.changecfg)
     with open(f'{savefolder}/cfg.yaml', 'w') as f:
         yaml.dump(cfg, f)
     denoizer = Res_UNet(**cfg['model']).to(device)
@@ -120,11 +121,11 @@ if __name__ == "__main__":
         realsigma = realsigma.to(device)
         realmu = realmu.to(device)
     pltr = Plotter(f'{savefolder}/graph.jpg')
-    if args.use_wandb:
+    if use_wandb:
         wandb.init(project='main')
         wandb.run.name = args.savefolder
         wandb.config = cfg
     for epoch in range(startepoch, cfg['epoch']):
         train()
-    if args.use_wandb:
+    if use_wandb:
         wandb.finish()

@@ -65,14 +65,14 @@ if __name__ == "__main__":
     parser.add_argument('--datasetpath', default='../data/')
     parser.add_argument('--savefolder', default='tmp')
     parser.add_argument('--savefolderbase', default='.')
-    parser.add_argument('--changecfg', default='')
+    parser.add_argument('--changecfg', default=None)
     parser.add_argument('--dis_wandb', default=False, action='store_true')
     parser.add_argument('--restart', default=False, action='store_true')
     args = parser.parse_args()
 
     savefolder = f'{args.savefolderbase}/result/{args.savefolder}'
     device = args.device
-    use_wandb=not args.dis_wandb
+    use_wandb = not args.dis_wandb
     if not args.restart:
         os.makedirs(f'{args.savefolderbase}/result', exist_ok=True)
         shutil.rmtree(savefolder, ignore_errors=True)
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         shutil.copy(args.model, f'{savefolder}/cfg.yaml')
     with open(f'{savefolder}/cfg.yaml') as file:
         cfg = yaml.safe_load(file)
-    cfg = U.setcfg(cfg, args.changecfg)
+    if args.changecfg: cfg = U.setcfg(cfg, args.changecfg)
     with open(f'{savefolder}/cfg.yaml', 'w') as f:
         yaml.dump(cfg, f)
     denoizer = Res_UNet(**cfg['model']).to(device)

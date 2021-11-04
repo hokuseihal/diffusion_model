@@ -29,7 +29,7 @@ def train():
         if idx % 2000 == 0:
             for stride in cfg['stride']:
                 wandb.log({'output': wandb.Image(
-                    U.make_grid(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT),
+                    U.make_grid(diffusion.sample(img=data,stride=stride, embch=cfg['model']['embch'], x=xT),
                                 s=0.5, m=0.5), caption=f'{gidx}_{stride}')})
             if (cfg['fid']):
                 fid = check_fid(2000)
@@ -118,7 +118,7 @@ if __name__ == "__main__":
         realsigma = realsigma.to(device)
         realmu = realmu.to(device)
     pltr = Plotter(f'{savefolder}/graph.jpg')
-    wandb.init(project='main')
+    wandb.init(project='inpaint')
     wandb.run.name = args.savefolder
     wandb.config = cfg
     for epoch in range(startepoch, cfg['epoch']):

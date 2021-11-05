@@ -6,6 +6,10 @@ batchsize: 8
 stride: [4]
 samplebatchsize: 8
 fid: False
+<<<<<<< HEAD
+=======
+fid_img: 100
+>>>>>>> master
 dataset: celeba
 diffusion:
   eta: 0

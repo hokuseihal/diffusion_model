@@ -17,6 +17,6 @@ def test_autocvt():
 def test_setcfg():
     assert {'a': 0} == setcfg({'a': 1}, 'a:0')
     assert {'a': {'b': 0.90}} == setcfg({'a': {'b': 1}}, 'a/b:0.90')
-    assert {'a': {'b': 0}, 'c': True} == setcfg({'a': {'b': 1}, 'c': False}, 'a/b:0,c:True')
+    assert {'a': {'b': 0}, 'c': True} == setcfg({'a': {'b': 1}, 'c': False}, 'a/b:0+c:True')
     assert {'a': {'b': 0, 'd': {'e': 'hi'}}, 'c': True} == \
-           setcfg({'a': {'b': 1, 'd': {'e': 'hello'}}, 'c': False}, 'a/b:0,c:True,a/d/e:hi')
+           setcfg({'a': {'b': 1, 'd': {'e': 'hello'}}, 'c': False}, 'a/b:0+c:True+a/d/e:hi')

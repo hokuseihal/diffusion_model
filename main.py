@@ -13,7 +13,6 @@ import utils.util as U
 import wandb
 from model.diffusion import Diffusion
 from model.res_unet import Res_UNet
-from plotter import Plotter
 from utils.gtmodel import fid_inception_v3
 from utils.tfrecord import TFRDataloader
 
@@ -32,22 +31,22 @@ def train():
                     wandb.log({'output': wandb.Image(gen_img, caption=f'{gidx}_{stride}')})
                 else:
                     U.save_image(gen_img, f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
-            if (cfg['fid']):
-                fid = check_fid(2000)
-                pltr.addvalue({'fid': fid}, gidx)
+                if (cfg['fid']):
+                    fid = check_fid(cfg['fid_img'], stride)
+                    if use_wandb: wandb.log({f'fid_{stride}': fid})
     torch.save(denoizer.module.state_dict(), f'{savefolder}/model.pth')
     with open(f'{savefolder}/epoch.txt', 'w') as f:
         f.write(f'{epoch},{gidx}')
 
 
 @torch.no_grad()
-def check_fid(num_image):
+def check_fid(num_image, stride):
     mvci = lfid.MeanCoVariance_iter(device)
     for idx in range(num_image // cfg['batchsize'] + 1):
-        print(idx, num_image, cfg['batchsize'])
+        print(idx, num_image, cfg['batchsize'] * (idx + 1))
         x = torch.randn(cfg['samplebatchsize'], cfg['model']['in_ch'], cfg['model']['size'], cfg['model']['size']).to(
             device)
-        x = diffusion.sample(stride=cfg['stride'], embch=cfg['model']['embch'], x=x)
+        x = diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=x)
         x = F.interpolate(x, (299, 299))
         mvci.iter(inception(x))
     fid = lfid.fid(realsigma, realmu, *mvci.get(isbias=True))
@@ -120,7 +119,6 @@ if __name__ == "__main__":
         realsigma, realmu = pkl.load(f)
         realsigma = realsigma.to(device)
         realmu = realmu.to(device)
-    pltr = Plotter(f'{savefolder}/graph.jpg')
     if use_wandb:
         wandb.init(project='main')
         wandb.run.name = args.savefolder

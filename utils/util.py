@@ -84,7 +84,7 @@ def autocvt(s):
 
 
 def setcfg(cfg, kvs):
-    for kv in kvs.split('|'):
+    for kv in kvs.split('+'):
         keys, value = kv.split(':')
         _cfg = cfg
         for key in keys.split('/')[:-1]:

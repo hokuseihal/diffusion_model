@@ -18,4 +18,4 @@ def test_gentlenextsample(size=(8, 3, 8, 8), e_thres=1e-7):
         xt_1 = diffusion.a[t - stride].sqrt() * x0 + (1 - diffusion.a[t - stride]).sqrt() * e
         xt_x = diffusion.a[t].sqrt() * x0
         xt_e = (1 - diffusion.a[t]).sqrt() * e
-        assert (xt_1 - diffusion.gentlenextsample(xt_x, xt_e, t, stride)).mean() < e_thres
+        assert (xt_1 - diffusion.gentlenextsample(x0, e, t, stride)).mean() < e_thres

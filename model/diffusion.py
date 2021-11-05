@@ -75,6 +75,15 @@ class Diffusion:
         return self.ema_helper.state_dict() if self.ema else self.denoizer.state_dict()
 
     def trainbatch(self, x, idx):
+        def mul_coef(x, a, b, k=1e-3):
+            B, C, H, W = x.shape
+            a += k
+            b += k
+            assert C % 2 == 0
+            return torch.cat(
+                [torch.ones(C // 2, device=x.device)[None, :] * a[:, None],
+                 torch.ones(C // 2, device=x.device)[None, :] * b[:, None]], dim=1)[:, :, None, None] * x
+
         self.denoizer.train()
         B, C, H, W = x.shape if type(x) == type(torch.ones(1)) else x[0].shape
         T = torch.randint(self.n_iter, (B,))
@@ -84,11 +93,13 @@ class Diffusion:
             t = torch.cat([t, self.clsembd(cls).to(self.device)], dim=1)
         x = x.to(self.device)
         e = randn_like(x).to(self.device)
-        xt_x = self.a[T].view(-1, 1, 1, 1).sqrt() * x
-        xt_e = (1 - self.a[T].view(-1, 1, 1, 1)).sqrt() * e
-        target = torch.cat([xt_x, xt_e], dim=1)
+        x_coef = self.a[T]
+        e_coef = 1 - x_coef
+        xt_x = x_coef.view(-1, 1, 1, 1).sqrt() * x
+        xt_e = e_coef.view(-1, 1, 1, 1).sqrt() * e
+        target = torch.cat([x, e], dim=1)
         output = self.denoizer(xt_x + xt_e, t)
-        loss = self.criterion(target, output)
+        loss = self.criterion(mul_coef(target, x_coef, e_coef), mul_coef(output, x_coef, e_coef))
         (loss / self.subdivision).backward()
         # loss.backward()
         # torch.nn.utils.clip_grad_norm(
@@ -118,8 +129,8 @@ class Diffusion:
             ys = get_timestep_embedding(t.view(1), embch if not self.iscls else embch // 2).to(self.device)
             if self.iscls: ys = torch.cat([ys, clsemb], dim=1)
             # TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.
-            xt_x, xt_e = self.denoizer.module(x, ys).chunk(2, dim=1)
-            x = self.nextsample(xt_x=xt_x, xt_e=xt_e, t=t, stride=stride)
+            pred_x, pred_e = self.denoizer.module(x, ys).chunk(2, dim=1)
+            x = self.nextsample(pred_x=pred_x, pred_e=pred_e, t=t, stride=stride)
         print()
         if self.ema:
             self.denoizer.load_state_dict(state)
@@ -137,7 +148,6 @@ class Diffusion:
         x0_t = (xt - (1 - self.a[t]).sqrt() * et) / self.a[t].sqrt()
         return self.a[t - stride].sqrt() * x0_t + c1 * randn_like(xt) + c2 * et
 
-    def gentlenextsample(self, xt_x, xt_e, t, stride):
+    def gentlenextsample(self, pred_x, pred_e, t, stride):
         assert t - stride >= 0
-        return (self.a[t - stride] / self.a[t]).sqrt() * xt_x \
-               + ((1 - self.a[t - stride]) / (1 - self.a[t])).sqrt() * xt_e
+        return (self.a[t - stride]).sqrt() * pred_x + (1 - self.a[t - stride]).sqrt() * pred_e

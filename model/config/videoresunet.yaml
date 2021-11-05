@@ -1,0 +1,36 @@
+n_iter: 1000
+type: ddpm
+loss: mse
+epoch: -1
+batchsize: 16
+stride: [4]
+samplebatchsize: 4
+fid: False
+dataset: ucf101
+numframe: 8
+iscls: False
+diffusion:
+  eta: 0
+  g_clip: 1.0
+  schedule: linear
+  lr: 0.0001
+  amp: False
+  subdivision: 2
+  ema: True
+  ema_mu: 0.999
+model:
+  in_ch: 3
+  feature: 128
+  embch: 32
+  size: 64
+  attn_res: [16, ]
+  chs: [ 1,2,2,2,4 ]
+  num_res_block: 2
+  bottle_attn: True
+  isclsemb: False
+  dropout: 0.1
+  group: 1
+  out_ch: 3
+  motionsize: 8
+  motionfuture: 16
+  errfuture: 24

@@ -125,7 +125,7 @@ class Diffusion:
             cls = torch.randint(0, self.numcls, (1,))
             clsemb = self.clsembd(cls).to(self.device)
         for t in torch.arange(self.n_iter // stride * stride - 1, stride, -stride, dtype=torch.long):
-            print(f'\rsampling:{t}', end='')
+            print(f'sampling:{t}')
             ys = get_timestep_embedding(t.view(1), embch if not self.iscls else embch // 2).to(self.device)
             if self.iscls: ys = torch.cat([ys, clsemb], dim=1)
             # TODO A bug that here's output of nn.DataParallel is just only half, I don't know why.

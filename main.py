@@ -34,7 +34,7 @@ def train():
                     gen_img = diffusion.sample(stride=stride, embch=cfg['model']['embch'], img=data, shape=xT.shape)
                     gen_img_grid = U.make_grid(gen_img, s=0.5, m=0.5)
                     if use_wandb:
-                        wandb.log({'output': wandb.Image(gen_img_grid, caption=f'{gidx}_{stride}')})
+                        wandb.log({'output': wandb.Image(T.ToPILImage()(gen_img_grid), caption=f'{gidx}_{stride}')})
                     else:
                         U.save_image(gen_img_grid, f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
                     if (cfg['fid']):

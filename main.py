@@ -28,9 +28,9 @@ def train():
             for stride in cfg['stride']:
                 gen_img = U.make_grid(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT), s=0.5, m=0.5)
                 if use_wandb:
-                    wandb.log({'output': wandb.Image(gen_img, caption=f'{gidx}_{stride}')})
+                    wandb.log({'output': wandb.Image(T.ToPILImage()(gen_img), caption=f'{gidx}_{stride}')})
                 else:
-                    U.save_image(gen_img, f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
+                    U.save_image(gen_img, f'{savefolder}/{gidx}_{stride}.jpg')
                 if (cfg['fid']):
                     fid = check_fid(cfg['fid_img'], stride)
                     if use_wandb: wandb.log({f'fid_{stride}': fid})

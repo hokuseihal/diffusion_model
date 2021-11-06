@@ -120,12 +120,14 @@ class Res_AttnBlock(nn.Module):
 
 
 class Res_UNet(nn.Module):
-    def __init__(self, in_ch, feature, embch, size, bottle_attn, activate=nn.Hardswish(), attn_res=(), chs=(1, 2, 4),
+    def __init__(self, in_ch, feature, embch, size, bottle_attn, activate, attn_res=(), chs=(1, 2, 4),
                  num_res_block=1,
                  dropout=0, group=32,
                  isclsemb=False, out_ch=3, hopper=False, hopper_ch=8):
         super(Res_UNet, self).__init__()
         self.hopper = hopper
+        if activate is None:activate=nn.Hardswish()
+        elif activate=='silu':activate=nn.SiLU()
         self.emb = nn.Sequential(
             nn.Conv1d(embch, embch, 1, groups=2 if isclsemb else 1),
             activate,
@@ -187,10 +189,10 @@ class Res_UNet(nn.Module):
 if __name__ == '__main__':
     with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
                                 profile_memory=True) as p:
-        size = 512
+        size = 128
         batchsize = 8
         m = Res_UNet(in_ch=3, feature=128, size=size, embch=64, chs=(1, 1, 1, 2), hopper=True,
-                     attn_res=(32, 16, 8)).cuda()
+                     attn_res=(32, 16, 8),activate='silu',bottle_attn=False).cuda()
         print(m)
         x = torch.randn(batchsize, 3, size, size).cuda()
         temb = torch.randn(batchsize, 64).cuda()

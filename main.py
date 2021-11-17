@@ -28,9 +28,9 @@ def train():
             for stride in cfg['stride']:
                 gen_img = U.make_grid(diffusion.sample(stride=stride, embch=cfg['model']['embch'], x=xT), s=0.5, m=0.5)
                 if use_wandb:
-                    wandb.log({'output': wandb.Image(gen_img, caption=f'{gidx}_{stride}')})
+                    wandb.log({'output': wandb.Image(T.ToPILImage()(gen_img), caption=f'{gidx}_{stride}')})
                 else:
-                    U.save_image(gen_img, f'{savefolder}/{gidx}_{stride}.jpg', s=0.5, m=0.5)
+                    U.save_image(gen_img, f'{savefolder}/{gidx}_{stride}.jpg')
                 if (cfg['fid']):
                     fid = check_fid(cfg['fid_img'], stride)
                     if use_wandb: wandb.log({f'fid_{stride}': fid})
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     iscls = False
     numcls = None
     if cfg['dataset'] == 'celeba':
-        loader = TFRDataloader(path=args.datasetpath + '/celeba.tfrecord',
+        loader = TFRDataloader(path=args.datasetpath + '/ffhq.tfrecord',
                                batch=cfg['batchsize'] // cfg['diffusion']['subdivision'],
                                size=cfg['model']['size'], s=0.5, m=0.5)
         numimg = 202589
@@ -108,6 +108,7 @@ if __name__ == "__main__":
         iscls = True
         numcls = 10
         numimg = 157 * 32
+
     if cfg['epoch'] == -1:
         cfg['epoch'] = int(500000 / numimg * cfg['batchsize']) * cfg['diffusion']['subdivision']
     diffusion = Diffusion(denoizer=denoizer, criterion=criterion, device=device, iscls=iscls, numcls=numcls,

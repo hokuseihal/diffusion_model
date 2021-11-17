@@ -28,5 +28,6 @@ model:
   bottle_attn: True
   isclsemb: False
   dropout: 0
-  group: 4
+  group: 32
   out_ch: 3
+  activate: silu

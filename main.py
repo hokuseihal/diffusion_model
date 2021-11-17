@@ -120,7 +120,7 @@ if __name__ == "__main__":
         realsigma = realsigma.to(device)
         realmu = realmu.to(device)
     if use_wandb:
-        wandb.init(project='main')
+        wandb.init(project='gentle_train')
         wandb.run.name = args.savefolder
         wandb.config = cfg
     for epoch in range(startepoch, cfg['epoch']):

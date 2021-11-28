@@ -23,12 +23,13 @@ class TFRDataloader():
         image = tf.transpose(image, [2, 0, 1])
         return image, index
 
-    def __init__(self, path, batch, s, m, size=None):
+    def __init__(self, path, batch, s, m, size=None,get_index=False):
         self.path = path
         self.size = size
         self.batch = batch
         self.m = m
         self.s = s
+        self.get_index=get_index
         self.setdataset()
 
     def setdataset(self):
@@ -44,7 +45,10 @@ class TFRDataloader():
     def __next__(self):
         try:
             img, index = next(self.tfdataset)
-            return torch.from_numpy(img - self.m) / self.s, index
+            if self.get_index:
+                return torch.from_numpy(img - self.m) / self.s, index
+            else:
+                return torch.from_numpy(img - self.m) / self.s
         except StopIteration:
             self.setdataset()
             raise StopIteration

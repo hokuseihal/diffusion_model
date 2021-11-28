@@ -7,6 +7,7 @@ import yaml
 from model.vae import AutoEncoder as Model
 from utils.tfrecord import TFRDataloader
 from torch.cuda.amp import autocast,GradScaler
+from core import Plotter
 def operate(phase):
     if phase == 'train':
         model.train()
@@ -23,6 +24,7 @@ def operate(phase):
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
+        plotter.addvalue({f'loss:{phase}':loss.item()},idx+len(loader)*e)
         print(f'{phase}:{idx}/{len(loader)}:{loss.item():.4f}')
 
 
@@ -53,7 +55,9 @@ if __name__ == "__main__":
     model = Model(**cfg['vae']).to(device)
     optimizer = torch.optim.Adam(model.parameters())
     scaler=GradScaler()
+    plotter=Plotter(f'{savefolder}/graph.jpg')
 
     for e in range(args.epoch):
         operate('train')
         operate('val')
+        plotter.savedic()

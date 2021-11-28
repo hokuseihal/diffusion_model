@@ -3,6 +3,7 @@ from multiprocessing import cpu_count
 import torch
 import torch.nn as nn
 import yaml
+import os
 
 from model.vae import AutoEncoder as Model
 from utils.tfrecord import TFRDataloader
@@ -17,12 +18,14 @@ def operate(phase):
         loader = valloader
     for idx, data in enumerate(loader):
         data = data.to(device)
-        with autocast():
-            output = model.img2img(data,grad_enc=True)
-            loss = criterion(output, data)
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+        with torch.set_grad_enabled(phase=='train'):
+            with autocast():
+                output = model.img2img(data,grad_enc=True)
+                loss = criterion(output, data)
+            if phase=='train':
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
         optimizer.zero_grad()
         plotter.addvalue({f'loss:{phase}':loss.item()},idx+len(loader)*e)
         print(f'{phase}:{idx}/{len(loader)}:{loss.item():.4f}')
@@ -40,6 +43,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     savefolder=f'result/{args.savefolder}'
+    os.makedirs(savefolder,exist_ok=True)
     with open(args.cfg) as file:
         cfg = yaml.safe_load(file)
     if cfg['dataset'] == 'celeba':

@@ -117,7 +117,6 @@ class AutoEncoder(nn.Module):
     def img2img(self, x, grad_enc=True):
         with torch.set_grad_enabled(grad_enc):
             x = self.encoder(x)
-        print(x.shape)
         return self.decoder(x)
 
 
@@ -135,7 +134,7 @@ if __name__ == '__main__':
         out_ch=3
     )
     data = torch.randn(8, 3, 128, 128)
-    output = m.img2img(data, grad_enc=True)
+    output = m.img2img(data)
     print(output.shape)
     # from torch.utils.tensorboard import SummaryWriter
     # w=SummaryWriter()

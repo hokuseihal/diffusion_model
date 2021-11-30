@@ -121,21 +121,25 @@ class AutoEncoder(nn.Module):
 
 
 if __name__ == '__main__':
-    m = AutoEncoder(
-        feature=32,
-        block_features=[1, 1, 2, 2, 4, 4],
-        num_cell_per_block=2,
-        bntype='normal',
-        bn_eps=1e-5,
-        bn_momentum=0.05,
-        se_r=16,
-        expand_rate=3,
-        in_ch=3,
-        out_ch=3
-    )
-    data = torch.randn(8, 3, 128, 128)
-    output = m.img2img(data)
-    print(output.shape)
+    x=torch.randn(8,3,16,16,requires_grad=True)
+    # out=BatchNorm2DSwish.apply(x)
+    # out.mean().backward()
+    # print(bn.saved_tensors)
+    # m = AutoEncoder(
+    #     feature=32,
+    #     block_features=[1, 1, 2, 2, 4, 4],
+    #     num_cell_per_block=2,
+    #     bntype='fuse',
+    #     bn_eps=1e-5,
+    #     bn_momentum=0.05,
+    #     se_r=16,
+    #     expand_rate=3,
+    #     in_ch=3,
+    #     out_ch=3
+    # )
+    # data = torch.randn(8, 3, 128, 128)
+    # output = m.img2img(data)
+    # print(output.shape)
     # from torch.utils.tensorboard import SummaryWriter
     # w=SummaryWriter()
     # w.add_graph(m,data)

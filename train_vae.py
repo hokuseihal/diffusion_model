@@ -10,6 +10,7 @@ from utils.tfrecord import TFRDataloader
 from torch.cuda.amp import autocast,GradScaler
 from core import Plotter
 def operate(phase):
+    global gidx
     if phase == 'train':
         model.train()
         loader = trainloader
@@ -17,6 +18,7 @@ def operate(phase):
         model.eval()
         loader = valloader
     for idx, data in enumerate(loader):
+        gidx+=1
         data = data.to(device)
         with torch.set_grad_enabled(phase=='train'):
             with autocast():
@@ -27,7 +29,7 @@ def operate(phase):
                 scaler.step(optimizer)
                 scaler.update()
         optimizer.zero_grad()
-        plotter.addvalue({f'loss:{phase}':loss.item()},idx+len(loader)*e)
+        plotter.addvalue({f'loss:{phase}':loss.item()},gidx)
         print(f'{phase}:{idx}/{len(loader)}:{loss.item():.4f}')
 
 
@@ -62,6 +64,7 @@ if __name__ == "__main__":
     plotter=Plotter(f'{savefolder}/graph.jpg')
 
     for e in range(args.epoch):
+        gidx=-1
         operate('train')
         operate('val')
         plotter.savedic()

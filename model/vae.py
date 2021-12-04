@@ -110,7 +110,8 @@ class AutoEncoder(nn.Module):
         if self.moco['flag']:
             self.pre_k = None
             self.f_k_param = self.encoder.state_dict()
-            self.moco_queue = torch.randn(kwargs['feature'] * kwargs['block_features'][-1], self.moco['dic_size'])
+            self.moco_queue = nn.Parameter(
+                torch.randn(kwargs['feature'] * kwargs['block_features'][-1], self.moco['dic_size']))
 
     # def forward(self, x):
     #     raise ValueError('use other function')
@@ -132,17 +133,17 @@ class AutoEncoder(nn.Module):
 
     def trainenc_dec(self, x, loss, device):
         x = x.to(device)
-        output=self.img2img(x,grad_enc=True)
-        return loss(output, x),output.cpu()
+        output = self.img2img(x, grad_enc=True)
+        return loss(output, x), output.cpu()
 
     def trainmoco(self, x, device):
         imgaugq, imgaugk = x
         imgaugk = imgaugk.to(device)
         imgaugq = imgaugq.to(device)
-        B, C, H, W = imgaugq.shape
+        B, _, _, _ = imgaugq.shape
         # save for queue
-        if self.pre_k:
-            self.moco_queue = torch.cat([self.moco_queue[:B], self.pre_k])
+        if self.pre_k != None:
+            self.moco_queue.data = torch.cat([self.moco_queue[:,:-B], self.pre_k.view(B,-1).transpose(0,1)],dim=1)
         self.f_q_param = self.encoder.cpu().state_dict()
         for f_k_p_key, f_q_p_key in zip(self.f_k_param, self.f_q_param):
             assert f_k_p_key == f_k_p_key
@@ -156,10 +157,11 @@ class AutoEncoder(nn.Module):
         self.encoder.load_state_dict(self.f_q_param)
         self.encoder.to(device)
         q = self.encoder(imgaugq)
-        l_pos = torch.bmm(q.view(B, 1, C), k.view(B, C, 1))
+        B, C, _, _ = q.shape
+        l_pos = torch.bmm(q.view(B, 1, C), k.view(B, C, 1)).view(-1, 1)
         l_neg = torch.mm(q.view(B, C), self.moco_queue.view(C, self.moco['dic_size']))
-        logits = torch.cat([l_pos, l_neg], dim=1) / self.moco['k']
-        return F.cross_entropy(logits, torch.zeros(B))
+        logits = torch.cat([l_pos, l_neg], dim=1) / self.moco['t']
+        return F.cross_entropy(logits, torch.zeros(B, dtype=torch.long).to(device))
 
 
 if __name__ == '__main__':

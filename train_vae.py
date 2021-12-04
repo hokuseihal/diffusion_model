@@ -25,12 +25,15 @@ def operate(phase):
         gidx += 1
         with torch.set_grad_enabled(phase == 'train'):
             with autocast():
-                loss, outimg = model.trainenc_dec(data, criterion, device)
+                if cfg['vae']['moco']['flag']:
+                    loss=model.trainmoco(data,device)
+                else:
+                    loss, outimg = model.trainenc_dec(data, criterion, device)
             if phase == 'train':
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
-            else:
+            elif not cfg['vae']['moco']['flag']:
                 gen_img = U.make_grid(torch.cat([data,outimg.to(torch.float32)],dim=2), s=0.5, m=0.5)
                 if not args.dis_wandb:
                     wandb.log({'output': wandb.Image(T.ToPILImage()(gen_img), caption=f'{gidx}')})

@@ -31,3 +31,4 @@ model:
   group: 32
   out_ch: 3
   activate: silu
+  kernel1: False

@@ -7,6 +7,18 @@ import torch
 
 class TFRDataloader():
     def _parse_image_function(self, example_proto):
+        def augmentation(image):
+            MAX_DELTA = 0.4
+            QUALITY = (0, 100)
+            CONTRAST = (0.25, 1)
+            image_aug = tf.image.random_flip_left_right(image)
+            image_aug = tf.image.random_brightness(image_aug, MAX_DELTA)
+            image_aug = tf.image.random_hue(image_aug, MAX_DELTA)
+            image_aug = tf.image.random_contrast(image_aug, *CONTRAST)
+            image_aug = tf.image.random_jpeg_quality(image_aug, *QUALITY)
+            image_aug = tf.transpose(image_aug, [2, 0, 1])
+            return image_aug
+
         parsed_example = tf.io.parse_single_example(example_proto, {
             'image': tf.io.FixedLenFeature([], tf.string),
             'index': tf.io.FixedLenFeature([], tf.int64)
@@ -20,16 +32,22 @@ class TFRDataloader():
             minsize = tf.minimum(s[0], s[1])
             image = tf.image.resize_with_crop_or_pad(image, minsize, minsize)
             image = tf.image.resize(image, [self.size, self.size])
+        image_aug0 = 0
+        image_aug1 = 0
+        if self.get_aug:
+            image_aug0 = augmentation(image)
+            image_aug1 = augmentation(image)
         image = tf.transpose(image, [2, 0, 1])
-        return image, index
+        return image, index, image_aug0, image_aug1
 
-    def __init__(self, path, batch, s, m, size=None,get_index=False):
+    def __init__(self, path, batch, s, m, size=None, get_index=False, get_aug=False):
         self.path = path
         self.size = size
         self.batch = batch
         self.m = m
         self.s = s
-        self.get_index=get_index
+        self.get_index = get_index
+        self.get_aug = get_aug
         self.setdataset()
 
     def setdataset(self):
@@ -44,9 +62,11 @@ class TFRDataloader():
 
     def __next__(self):
         try:
-            img, index = next(self.tfdataset)
+            img, index, img_aug0,img_aug1 = next(self.tfdataset)
             if self.get_index:
                 return torch.from_numpy(img - self.m) / self.s, index
+            elif self.get_aug:
+                return torch.from_numpy(img_aug0 - self.m) / self.s, torch.from_numpy(img_aug1 - self.m) / self.s
             else:
                 return torch.from_numpy(img - self.m) / self.s
         except StopIteration:
@@ -93,12 +113,17 @@ def maketfrecord(txtpath, tfrpath):
 
 if __name__ == '__main__':
     # tfdataset=tf.data.TFRecordDataset(path).map(_parse_image_function).as_numpy_iterator()
-    maketfrecord('train.txt', 'tmp.tfrecord')
+    # maketfrecord('train.txt', 'tmp.tfrecord')
     # path = 'tmp.tfrecord'
     # for i, x in enumerate(TFRDataloader(path=path, size=128, epoch=1, batch=1,s=1,m=0)):
     #     print(x.permute(0,3,2,1).reshape(-1,3).mean(0))
     #
     # loader=TFRDataloader('../data/celeba.tfrecord',1,2048,0,0)
-    loader = TFRDataloader('tmp.tfrecord', batch=64, s=1, m=0, size=128)
+    import torchvision.transforms as T
+    import torchvision.utils as TU
+
+    loader = TFRDataloader('tmp.tfrecord', batch=32, s=1, m=0, size=128, get_aug=True)
     for idx, x in enumerate(loader):
-        print(x)
+        x, aug = x
+        T.ToPILImage()(TU.make_grid(aug)).show()
+        break

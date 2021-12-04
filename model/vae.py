@@ -6,15 +6,15 @@ from thirdparty.inplaced_sync_batchnorm import SyncBatchNormSwish
 
 
 class GenerativeCell(nn.Module):
-    def __init__(self, ch_in, ch_out, expand_rate, bntype, bn_eps, bn_momentum, se_r):
+    def __init__(self, ch_in, ch_out, expand_rate, bntype, bn_eps, bn_momentum, se_r, **kwargs):
         super(GenerativeCell, self).__init__()
         self.layers = nn.Sequential(*[
             nn.BatchNorm2d(ch_in, eps=bn_eps, momentum=bn_momentum),
-            nn.Conv2d(ch_in, ch_out*expand_rate, 1),
-            bnswish(bntype)(ch_out*expand_rate, eps=bn_eps, momentum=bn_momentum),
-            nn.Conv2d(ch_out*expand_rate, ch_out * expand_rate, 5, padding=2, groups=ch_out),
-            bnswish(bntype)(ch_out*expand_rate, eps=bn_eps, momentum=bn_momentum),
-            nn.Conv2d(ch_out*expand_rate, ch_out, 1),
+            nn.Conv2d(ch_in, ch_out * expand_rate, 1),
+            bnswish(bntype)(ch_out * expand_rate, eps=bn_eps, momentum=bn_momentum),
+            nn.Conv2d(ch_out * expand_rate, ch_out * expand_rate, 5, padding=2, groups=ch_out),
+            bnswish(bntype)(ch_out * expand_rate, eps=bn_eps, momentum=bn_momentum),
+            nn.Conv2d(ch_out * expand_rate, ch_out, 1),
             nn.BatchNorm2d(ch_out, eps=bn_eps, momentum=bn_momentum),
             SE(ch_out, se_r)
         ])
@@ -36,12 +36,12 @@ class SE(nn.Module):
             GAP(),
             nn.Linear(feature, feature // r),
             nn.ReLU(inplace=True),
-            nn.Linear(feature//r, feature),
+            nn.Linear(feature // r, feature),
             nn.Sigmoid()
         ])
 
     def forward(self, x):
-        return self.layers(x)[...,None,None] * x
+        return self.layers(x)[..., None, None] * x
 
 
 class BNSwish(nn.Module):
@@ -73,18 +73,23 @@ class EncoderCell(nn.Module):
 
 
 class Coder(nn.Module):
-    def __init__(self, moduletype, feature, block_features, num_cell_per_block, in_ch, out_ch, **kwargs):
+    def __init__(self, moduletype, feature, block_features, num_cell_per_block, in_ch, out_ch, inter_feature, **kwargs):
         super(Coder, self).__init__()
-        module = EncoderCell if moduletype == 'encoder' else GenerativeCell
+        if moduletype == 'encoder':
+            module = EncoderCell
+            out_ch = inter_feature
+        else:
+            module = GenerativeCell
+            in_ch = inter_feature
         layres = [nn.Conv2d(in_ch, feature * block_features[0], 1)]
         prefeature = feature
         block_features = [ch * feature for ch in block_features]
-        for b_idx,feature in enumerate(block_features):
+        for b_idx, feature in enumerate(block_features):
             layres.append(module(prefeature, feature, **kwargs))
             for idx in range(num_cell_per_block - 1):
                 layres.append(module(feature, feature, **kwargs))
             layres.append(nn.Upsample(mode='bilinear', scale_factor=0.5 if moduletype == 'encoder' else 2))
-            prefeature=feature
+            prefeature = feature
         layres.append(nn.Conv2d(block_features[-1], out_ch, 1))
         self.layers = nn.Sequential(*layres)
 
@@ -101,6 +106,11 @@ class AutoEncoder(nn.Module):
         super(AutoEncoder, self).__init__()
         self.encoder = Coder('encoder', **kwargs)
         self.decoder = Coder('decoder', **kwargs)
+        self.moco = kwargs['moco']
+        if self.moco['flag']:
+            self.pre_k = None
+            self.f_k_param = self.encoder.state_dict()
+            self.moco_queue = torch.randn(kwargs['feature'] * kwargs['block_features'][-1], self.moco['dic_size'])
 
     # def forward(self, x):
     #     raise ValueError('use other function')
@@ -114,14 +124,46 @@ class AutoEncoder(nn.Module):
     def latent2img(self, z):
         return self.decoder(z)
 
-    def img2img(self, x, grad_enc=True):
+    def img2img(self, x, grad_enc):
         with torch.set_grad_enabled(grad_enc):
             x = self.encoder(x)
+        # print(x.shape)
         return self.decoder(x)
+
+    def trainenc_dec(self, x, loss, device):
+        x = x.to(device)
+        output=self.img2img(x,grad_enc=True)
+        return loss(output, x),output.cpu()
+
+    def trainmoco(self, x, device):
+        imgaugq, imgaugk = x
+        imgaugk = imgaugk.to(device)
+        imgaugq = imgaugq.to(device)
+        B, C, H, W = imgaugq.shape
+        # save for queue
+        if self.pre_k:
+            self.moco_queue = torch.cat([self.moco_queue[:B], self.pre_k])
+        self.f_q_param = self.encoder.cpu().state_dict()
+        for f_k_p_key, f_q_p_key in zip(self.f_k_param, self.f_q_param):
+            assert f_k_p_key == f_k_p_key
+            self.f_k_param[f_k_p_key] = self.moco['m'] * self.f_k_param[f_k_p_key] + (1 - self.moco['m']) * \
+                                        self.f_q_param[f_q_p_key]
+        with torch.no_grad():
+            self.encoder.load_state_dict(self.f_k_param)
+            self.encoder.to(device)
+            k = self.encoder(imgaugk)
+            self.pre_k = k
+        self.encoder.load_state_dict(self.f_q_param)
+        self.encoder.to(device)
+        q = self.encoder(imgaugq)
+        l_pos = torch.bmm(q.view(B, 1, C), k.view(B, C, 1))
+        l_neg = torch.mm(q.view(B, C), self.moco_queue.view(C, self.moco['dic_size']))
+        logits = torch.cat([l_pos, l_neg], dim=1) / self.moco['k']
+        return F.cross_entropy(logits, torch.zeros(B))
 
 
 if __name__ == '__main__':
-    x=torch.randn(8,3,16,16,requires_grad=True)
+    x = torch.randn(8, 3, 16, 16, requires_grad=True)
     # out=BatchNorm2DSwish.apply(x)
     # out.mean().backward()
     # print(bn.saved_tensors)

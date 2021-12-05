@@ -8,6 +8,7 @@ samplebatchsize: 8
 fid: False
 fid_img: 100
 dataset: celeba
+size: 64
 diffusion:
   eta: 0
   g_clip: 1.0
@@ -32,3 +33,9 @@ model:
   out_ch: 3
   activate: silu
   kernel1: False
+  moco:
+    flag: True
+    m: 0.999
+    #    dic_size: 65536
+    dic_size: 36
+    t: 0.7

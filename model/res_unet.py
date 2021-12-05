@@ -132,7 +132,7 @@ class Res_UNet(nn.Module):
     def __init__(self, in_ch, feature, embch, size, bottle_attn, activate, attn_res=(), chs=(1, 2, 4),
                  num_res_block=1,
                  dropout=0, group=32,
-                 isclsemb=False, out_ch=3, hopper=False, hopper_ch=8, kernel1=False):
+                 isclsemb=False, out_ch=3, hopper=False, hopper_ch=8, kernel1=False,**kwargs):
         self.kernel1 = kernel1
         super(Res_UNet, self).__init__()
         self.hopper = hopper

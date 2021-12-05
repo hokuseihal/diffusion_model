@@ -20,7 +20,7 @@ class GenerativeCell(nn.Module):
         ])
 
     def forward(self, x):
-        return self.layers(x)
+        return self.layers(x)+x
 
 
 class GAP(nn.Module):
@@ -69,7 +69,7 @@ class EncoderCell(nn.Module):
         ])
 
     def forward(self, x):
-        return self.layers(x)
+        return self.layers(x)+x
 
 
 class Coder(nn.Module):

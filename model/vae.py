@@ -18,9 +18,13 @@ class GenerativeCell(nn.Module):
             nn.BatchNorm2d(ch_out, eps=bn_eps, momentum=bn_momentum),
             SE(ch_out, se_r)
         ])
+        if ch_in!=ch_out:
+            self.skip=nn.Conv2d(ch_in,ch_out,1)
+        else:
+            self.skip=nn.Identity()
 
     def forward(self, x):
-        return self.layers(x)+x
+        return self.layers(x)+self.skip(x)
 
 
 class GAP(nn.Module):
@@ -67,9 +71,13 @@ class EncoderCell(nn.Module):
             nn.Conv2d(ch_out, ch_out, 3, padding=1),
             SE(ch_out, se_r)
         ])
+        if ch_in!=ch_out:
+            self.skip=nn.Conv2d(ch_in,ch_out,1)
+        else:
+            self.skip=nn.Identity()
 
     def forward(self, x):
-        return self.layers(x)+x
+        return self.layers(x)+self.skip(x)
 
 
 class Coder(nn.Module):

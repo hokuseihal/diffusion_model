@@ -63,7 +63,7 @@ if __name__ == "__main__":
     with open(args.cfg) as file:
         cfg = yaml.safe_load(file)
     if not args.dis_wandb:
-        wandb.init(project='vae' if cfg['moco']['flag'] else 'moco')
+        wandb.init(project='vae' if cfg['model']['moco']['flag'] else 'moco')
         wandb.run.name = args.savefolder
     if cfg['dataset'] == 'celeba':
         trainloader = TFRDataloader(path=args.datasetpath + '/ffhq_train.tfrecord',
@@ -72,12 +72,12 @@ if __name__ == "__main__":
         valloader = TFRDataloader(path=args.datasetpath + '/ffhq_val.tfrecord',
                                   batch=cfg['batchsize'],
                                   size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
-        # trainloader = TFRDataloader(path='tmp.tfrecord',
-        #                             batch=cfg['batchsize'],
-        #                             size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
-        # valloader = TFRDataloader(path='tmp.tfrecord',
-        #                           batch=cfg['batchsize'],
-        #                           size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
+        trainloader = TFRDataloader(path='tmp.tfrecord',
+                                    batch=cfg['batchsize'],
+                                    size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
+        valloader = TFRDataloader(path='tmp.tfrecord',
+                                  batch=cfg['batchsize'],
+                                  size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
 
     device = args.device
     criterion = nn.L1Loss()

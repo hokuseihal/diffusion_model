@@ -58,13 +58,13 @@ if __name__ == "__main__":
     parser.add_argument('--dis_wandb', default=False, action='store_true')
     args = parser.parse_args()
 
-    if not args.dis_wandb:
-        wandb.init(project='main')
-        wandb.run.name = args.savefolder
     savefolder = f'result/{args.savefolder}'
     os.makedirs(savefolder, exist_ok=True)
     with open(args.cfg) as file:
         cfg = yaml.safe_load(file)
+    if not args.dis_wandb:
+        wandb.init(project='vae' if cfg['moco']['flag'] else 'moco')
+        wandb.run.name = args.savefolder
     if cfg['dataset'] == 'celeba':
         trainloader = TFRDataloader(path=args.datasetpath + '/ffhq_train.tfrecord',
                                     batch=cfg['batchsize'],

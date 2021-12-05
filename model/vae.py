@@ -111,7 +111,7 @@ class AutoEncoder(nn.Module):
             self.pre_k = None
             self.f_k_param = self.encoder.state_dict()
             self.moco_queue = nn.Parameter(
-                torch.randn(kwargs['feature'] * kwargs['block_features'][-1], self.moco['dic_size']))
+                torch.randn(kwargs['inter_feature'], self.moco['dic_size']))
 
     # def forward(self, x):
     #     raise ValueError('use other function')
@@ -143,7 +143,7 @@ class AutoEncoder(nn.Module):
         B, _, _, _ = imgaugq.shape
         # save for queue
         if self.pre_k != None:
-            self.moco_queue.data = torch.cat([self.moco_queue[:,:-B], self.pre_k.view(B,-1).transpose(0,1)],dim=1)
+            self.moco_queue.data = torch.cat([self.moco_queue[:,:-self.pre_B], self.pre_k.view(self.pre_B,-1).transpose(0,1)],dim=1)
         self.f_q_param = self.encoder.cpu().state_dict()
         for f_k_p_key, f_q_p_key in zip(self.f_k_param, self.f_q_param):
             assert f_k_p_key == f_k_p_key
@@ -154,6 +154,7 @@ class AutoEncoder(nn.Module):
             self.encoder.to(device)
             k = self.encoder(imgaugk)
             self.pre_k = k
+            self.pre_B=B
         self.encoder.load_state_dict(self.f_q_param)
         self.encoder.to(device)
         q = self.encoder(imgaugq)

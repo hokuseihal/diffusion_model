@@ -71,12 +71,12 @@ if __name__ == "__main__":
         valloader = TFRDataloader(path=args.datasetpath + '/ffhq_val.tfrecord',
                                   batch=cfg['batchsize'] // cfg['subdivision'],
                                   size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['vae']['moco']['flag'])
-        # trainloader = TFRDataloader(path='tmp.tfrecord',
-        #                             batch=cfg['batchsize'] // cfg['subdivision'],
-        #                             size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['vae']['moco']['flag'])
-        # valloader = TFRDataloader(path='tmp.tfrecord',
-        #                           batch=cfg['batchsize'] // cfg['subdivision'],
-        #                           size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['vae']['moco']['flag'])
+        trainloader = TFRDataloader(path='tmp.tfrecord',
+                                    batch=cfg['batchsize'] // cfg['subdivision'],
+                                    size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['vae']['moco']['flag'])
+        valloader = TFRDataloader(path='tmp.tfrecord',
+                                  batch=cfg['batchsize'] // cfg['subdivision'],
+                                  size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['vae']['moco']['flag'])
 
     device = args.device
     criterion = nn.L1Loss()
@@ -88,5 +88,6 @@ if __name__ == "__main__":
     for e in range(args.epoch):
         operate('train')
         operate('val')
+        torch.save(model.state_dict(),f'{savefolder}/model.pth')
     if not args.dis_wandb:
         wandb.finish()

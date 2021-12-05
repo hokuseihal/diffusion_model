@@ -9,11 +9,11 @@ def conv(in_ch, out_ch, kernal):
     elif kernal == 3:
         return nn.Conv2d(in_ch, out_ch, kernal, padding=1)
     else:
-        assert False,"The kernel must be 3 or 1."
+        assert False, "The kernel must be 3 or 1."
 
 
 class DeepRes(nn.Module):
-    def __init__(self, in_ch, feature, scale,kernel1):
+    def __init__(self, in_ch, feature, scale, kernel1):
         super(DeepRes, self).__init__()
         self.scale = scale
         self.conv1_1 = conv(in_ch, feature, 1)
@@ -45,7 +45,7 @@ class DeepRes(nn.Module):
 
 
 class Hopper(nn.Module):
-    def __init__(self, times, in_ch, feature, scale,kernel1):
+    def __init__(self, times, in_ch, feature, scale, kernel1):
         super(Hopper, self).__init__()
 
         def layers():
@@ -57,7 +57,7 @@ class Hopper(nn.Module):
 
         self.layers = []
         for _ in range(times):
-            self.layers.extend([DeepRes(in_ch=in_ch, feature=feature, scale=scale,kernel1=kernel1)])
+            self.layers.extend([DeepRes(in_ch=in_ch, feature=feature, scale=scale, kernel1=kernel1)])
         self.layers = nn.Sequential(*self.layers)
 
     def forward(self, x):
@@ -65,7 +65,7 @@ class Hopper(nn.Module):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_ch, embch, dropout, outch, group, isclsemb, activate,kernel1):
+    def __init__(self, in_ch, embch, dropout, outch, group, isclsemb, activate, kernel1):
         super(ResBlock, self).__init__()
         outch = in_ch if outch is None else outch
         self.isclsemb = isclsemb
@@ -132,8 +132,8 @@ class Res_UNet(nn.Module):
     def __init__(self, in_ch, feature, embch, size, bottle_attn, activate, attn_res=(), chs=(1, 2, 4),
                  num_res_block=1,
                  dropout=0, group=32,
-                 isclsemb=False, out_ch=3, hopper=False, hopper_ch=8,kernel1=False):
-        self.kernel1=kernel1
+                 isclsemb=False, out_ch=3, hopper=False, hopper_ch=8, kernel1=False):
+        self.kernel1 = kernel1
         super(Res_UNet, self).__init__()
         self.hopper = hopper
         if activate is None:
@@ -146,7 +146,7 @@ class Res_UNet(nn.Module):
             nn.Conv1d(embch, embch, 1, groups=2 if isclsemb else 1),
         )
         _res_ch = lambda ch, outch=None: ResBlock(in_ch=ch, outch=outch, embch=embch, activate=activate, group=group,
-                                                  isclsemb=isclsemb, dropout=dropout,kernel1=kernel1)
+                                                  isclsemb=isclsemb, dropout=dropout, kernel1=kernel1)
         self.convin = conv(in_ch, feature, 3)
         bottle = [
             _res_ch(feature * chs[-1]),
@@ -171,15 +171,16 @@ class Res_UNet(nn.Module):
             self.up.insert(0, Res_AttnBlock(_up))
             res //= 2
         self.hopper_down = Hopper(times=3, in_ch=3, feature=hopper_ch,
-                                  scale=0.5,kernel1=kernel1) if hopper else nn.Sequential()
-        self.hopper_up = Hopper(times=3, in_ch=3, feature=hopper_ch, scale=2,kernel1=kernel1) if hopper else nn.Sequential()
+                                  scale=0.5, kernel1=kernel1) if hopper else nn.Sequential()
+        self.hopper_up = Hopper(times=3, in_ch=3, feature=hopper_ch, scale=2,
+                                kernel1=kernel1) if hopper else nn.Sequential()
         self.out = nn.Sequential(
             nn.GroupNorm(group, feature * chs[0]),
             activate,
             conv(feature * chs[0], out_ch, 1)
         )
 
-    def forward(self, x, emb):
+    def forward(self, x, emb, get_latent=False):
         skips = []
 
         emb = self.emb(emb[:, :, None])[:, :, 0]
@@ -189,6 +190,7 @@ class Res_UNet(nn.Module):
             x = l(x, emb)
             skips.append(x)
             if idx < len(self.down) - 1 and not self.kernel1: x = F.interpolate(x, scale_factor=0.5, mode='bilinear')
+        if get_latent: return skips
         for idx, l in enumerate(self.up):
             tmp = skips.pop(-1)
             x = l(torch.cat([x, tmp], dim=1), emb)
@@ -201,10 +203,10 @@ class Res_UNet(nn.Module):
 if __name__ == '__main__':
     with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
                                 profile_memory=True) as p:
-        size = 1
-        batchsize = 64
-        m = Res_UNet(in_ch=3, feature=128, size=size, embch=64, chs=(1, 1, 1, 2,2,2), hopper=False,
-                     attn_res=(32, 16, 8), activate='silu', bottle_attn=False,kernel1=True).cuda()
+        size = 128
+        batchsize = 16
+        m = Res_UNet(in_ch=3, feature=128, size=size, embch=64, chs=(1, 1, 1, 2, 2, 2), hopper=False,
+                     attn_res=(32, 16, 8), activate='silu', bottle_attn=False, kernel1=False).cuda()
         print(m)
         x = torch.randn(batchsize, 3, size, size).cuda()
         temb = torch.randn(batchsize, 64).cuda()

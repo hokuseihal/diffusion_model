@@ -72,12 +72,12 @@ if __name__ == "__main__":
         valloader = TFRDataloader(path=args.datasetpath + '/ffhq_val.tfrecord',
                                   batch=cfg['batchsize'],
                                   size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
-        trainloader = TFRDataloader(path='tmp.tfrecord',
-                                    batch=cfg['batchsize'],
-                                    size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
-        valloader = TFRDataloader(path='tmp.tfrecord',
-                                  batch=cfg['batchsize'],
-                                  size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
+        # trainloader = TFRDataloader(path='tmp.tfrecord',
+        #                             batch=cfg['batchsize'],
+        #                             size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
+        # valloader = TFRDataloader(path='tmp.tfrecord',
+        #                           batch=cfg['batchsize'],
+        #                           size=cfg['size'], s=0.5, m=0.5, get_aug=cfg['model']['moco']['flag'])
 
     device = args.device
     criterion = nn.L1Loss()
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     elif 'resunet.yaml' in args.cfg:
         Model=Res_UNet
     model = Model(**cfg['model']).to(device)
-    optimizer = torch.optim.Adam(model.parameters())
+    optimizer = torch.optim.Adam(model.parameters(),lr=cfg['lr'])
     scaler = GradScaler()
 
     gidx = -1
